@@ -20,7 +20,7 @@ export interface ScriptOptions {
 
 function getProductionBase(branch = '') {
   const branchPrefix = '' === branch ? '' : `@${branch}`;
-  return `https://cdn.jsdelivr.net/gh/igniteagency/{{repo}}${branchPrefix}/dist/prod/`;
+  return `https://cdn.jsdelivr.net/gh/igniteagency/wesley-webflow-site${branchPrefix}/dist/prod/`;
 }
 
 window.PRODUCTION_BASE = !window.location.hostname.includes('webflow.io')

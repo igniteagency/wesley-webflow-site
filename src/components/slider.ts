@@ -52,6 +52,10 @@ class Slider {
   }
 }
 
+window.loadScript('https://cdn.jsdelivr.net/npm/swiper@12/swiper-bundle.min.js', {
+  name: 'swiper',
+});
+
 document.addEventListener('scriptLoaded:swiper', () => {
   new Slider();
 });
