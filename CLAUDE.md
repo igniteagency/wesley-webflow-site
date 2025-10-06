@@ -119,7 +119,7 @@ document.addEventListener('scriptLoaded:library-name', (e) => {
 3. **Deploy**: Merge to `main` branch triggers GitHub Actions that:
    - Creates semver tag (patch by default, use `#major` or `#minor` in commit message for higher bumps)
    - Makes scripts available via jsDelivr CDN
-4. **CDN**: Scripts are served from `https://cdn.jsdelivr.net/gh/igniteagency/{{repo}}/dist/prod/`
+4. **CDN**: Scripts are served from `https://cdn.jsdelivr.net/gh/igniteagency/wesley-webflow-site/dist/prod/`
 
 ## Development Guidelines
 
