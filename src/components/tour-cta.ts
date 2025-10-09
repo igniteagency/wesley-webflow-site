@@ -27,6 +27,9 @@ class TourCtaDrawingReveal {
   }
 
   private init(): void {
+    // Only enable on fine pointers (mouse/trackpad), skip touch devices
+    if (!window.matchMedia('(pointer: fine)').matches) return;
+
     const svgs = document.querySelectorAll<SVGSVGElement>('svg[data-draw-svg]');
     svgs.forEach((svg) => this.setupSVG(svg));
   }
@@ -40,8 +43,7 @@ class TourCtaDrawingReveal {
       return;
     }
 
-    // Ensure pointer drawing works on touch without scrolling
-    (svg.style as any).touchAction = 'none';
+    // No need to adjust touch-action; we skip touch devices entirely
 
     // Create mask infrastructure
     const maskId = `draw-mask-${++TourCtaDrawingReveal.instanceCount}`;
@@ -60,10 +62,17 @@ class TourCtaDrawingReveal {
     // Apply mask to overlay rect so drawn path reveals background
     overlayRect.setAttribute('mask', `url(#${maskId})`);
 
-    // Track drawing across multiple segments (each drag gesture is one segment)
+    // Hide the visible white stroke; we only want the reveal via mask
+    visiblePath.setAttribute('stroke', 'none');
+
+    // Track drawing across multiple segments (each hover pass is one segment)
     const segments: Point[][] = [];
     let current: Point[] | null = null;
     let isDrawing = false;
+
+    // rAF throttle for pointermove
+    let rafPending = false;
+    let lastMoveEvent: PointerEvent | null = null;
 
     const updatePathFromSegments = () => {
       const d = segments
@@ -74,11 +83,8 @@ class TourCtaDrawingReveal {
       maskPath.setAttribute('d', d);
     };
 
-    const onPointerDown = (e: PointerEvent) => {
-      // Avoid scrolling on touch while drawing
-      if (e.pointerType === 'touch') e.preventDefault();
-      svg.setPointerCapture?.(e.pointerId);
-
+    const onPointerEnter = (e: PointerEvent) => {
+      // Begin a new segment on each enter
       const p = this.clientToSvgPoint(svg, e.clientX, e.clientY);
       current = [p];
       segments.push(current);
@@ -86,10 +92,10 @@ class TourCtaDrawingReveal {
       updatePathFromSegments();
     };
 
-    const onPointerMove = (e: PointerEvent) => {
-      if (!isDrawing || !current) return;
-      if (e.pointerType === 'touch') e.preventDefault();
-
+    const processMove = () => {
+      rafPending = false;
+      if (!isDrawing || !current || !lastMoveEvent) return;
+      const e = lastMoveEvent;
       const p = this.clientToSvgPoint(svg, e.clientX, e.clientY);
 
       // Throttle points by distance to keep path performant
@@ -104,17 +110,23 @@ class TourCtaDrawingReveal {
       updatePathFromSegments();
     };
 
-    const endDrawing = (e?: PointerEvent) => {
-      if (e && e.pointerType === 'touch') e.preventDefault();
+    const onPointerMove = (e: PointerEvent) => {
+      if (!isDrawing || !current) return;
+      lastMoveEvent = e;
+      if (!rafPending) {
+        rafPending = true;
+        requestAnimationFrame(processMove);
+      }
+    };
+
+    const onPointerLeave = () => {
       isDrawing = false;
       current = null;
     };
 
-    svg.addEventListener('pointerdown', onPointerDown);
-    svg.addEventListener('pointermove', onPointerMove, { passive: false });
-    svg.addEventListener('pointerup', endDrawing);
-    svg.addEventListener('pointercancel', endDrawing);
-    svg.addEventListener('pointerleave', endDrawing);
+    svg.addEventListener('pointerenter', onPointerEnter);
+    svg.addEventListener('pointermove', onPointerMove, { passive: true });
+    svg.addEventListener('pointerleave', onPointerLeave);
 
     // Optional: clear drawing with Escape key when SVG is focused/active
     const onKeyDown = (e: KeyboardEvent) => {
