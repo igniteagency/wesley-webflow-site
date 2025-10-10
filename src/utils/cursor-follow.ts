@@ -22,7 +22,9 @@ export function initCursorFollow(): void {
       left: 0,
       xPercent: -50,
       yPercent: -50,
-      scale: 0,
+      // Keep native size; manage visibility with opacity only
+      scale: 1,
+      opacity: 0,
       transformOrigin: '50% 50%',
       willChange: 'transform',
       force3D: true,
@@ -76,7 +78,7 @@ export function initCursorFollow(): void {
       updateSize();
       const { x, y } = localXY(e);
       gsap.set(follower, { x, y });
-      gsap.to(follower, { scale: 1, duration: 0.25, ease: 'power3.out' });
+      gsap.to(follower, { opacity: 1, duration: 0.25, ease: 'power3.out' });
       primed = true;
     });
 
@@ -92,7 +94,7 @@ export function initCursorFollow(): void {
     });
 
     container.addEventListener('pointerleave', () => {
-      gsap.to(follower, { scale: 0, duration: 0.2, ease: 'power3.in' });
+      gsap.to(follower, { opacity: 0, duration: 0.2, ease: 'power3.in' });
       primed = false;
     });
   });
