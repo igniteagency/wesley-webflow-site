@@ -13,15 +13,57 @@
  * - Dialogs use the Dialog component elsewhere in the codebase; we call
  *   showModal/close directly and dispatch matched custom events for parity.
  */
+import { gsapHorizontalDraggableLoop } from '$utils/gsap-draggable-loop-slider';
 
 class StorySlider {
   private readonly COMPONENT_SELECTOR = '[data-slider-el="component"]';
   private readonly NAV_PREV_BUTTON_SELECTOR = '[data-slider-el="nav-prev"]';
   private readonly NAV_NEXT_BUTTON_SELECTOR = '[data-slider-el="nav-next"]';
 
+  private readonly SECTION_SELECTOR = '.section_stories';
+  private readonly STORIES_ITEM_SELECTOR = '.stories_item';
+
+  private readonly ACTIVE_SLIDE_CLASS = 'is-active';
+
   constructor() {
     console.info('[StorySlider] init');
+    this.initDraggableMainSlider();
     this.bindInnerSliderBoundaryClicks();
+  }
+
+  private initDraggableMainSlider() {
+    const sectionEl = document.querySelector(this.SECTION_SELECTOR);
+    if (!sectionEl) {
+      console.warn('[StorySlider] no stories section found');
+      return;
+    }
+
+    const storyItemsList = Array.from(sectionEl.querySelectorAll(this.STORIES_ITEM_SELECTOR));
+
+    if (storyItemsList.length === 0) {
+      console.warn('[StorySlider] no story items found');
+      return;
+    }
+
+    let activeElement: HTMLElement | null;
+    const loop = gsapHorizontalDraggableLoop(storyItemsList, {
+      paused: true,
+      draggable: storyItemsList.length > 6 ? true : false, // make it draggable
+      center: true, // active element is the one in the center of the container rather than th left edge
+      onChange: (element, index) => {
+        // when the active element changes, this function gets called.
+        activeElement && activeElement.classList.remove(this.ACTIVE_SLIDE_CLASS);
+        element.classList.add(this.ACTIVE_SLIDE_CLASS);
+        activeElement = element;
+      },
+    });
+
+    sectionEl
+      .querySelector(this.NAV_NEXT_BUTTON_SELECTOR)
+      ?.addEventListener('click', () => loop.next({ duration: 0.4, ease: 'power1.inOut' }));
+    sectionEl
+      .querySelector(this.NAV_PREV_BUTTON_SELECTOR)
+      ?.addEventListener('click', () => loop.previous({ duration: 0.4, ease: 'power1.inOut' }));
   }
 
   /** Binds click handlers on inner slider nav buttons inside dialogs */
@@ -103,9 +145,10 @@ class StorySlider {
     if (outerSwiper && currentOuterSlide) {
       const wrapper = outerSwiper.querySelector<HTMLElement>('.swiper-wrapper');
       const slides = wrapper
-        ? (Array.from(wrapper.children).filter((el) =>
-            (el as HTMLElement).classList?.contains('swiper-slide') &&
-            !(el as HTMLElement).classList?.contains('swiper-slide-duplicate')
+        ? (Array.from(wrapper.children).filter(
+            (el) =>
+              (el as HTMLElement).classList?.contains('swiper-slide') &&
+              !(el as HTMLElement).classList?.contains('swiper-slide-duplicate')
           ) as HTMLElement[])
         : [];
 
@@ -151,9 +194,9 @@ class StorySlider {
   }
 
   /** Get current active slide index and total for an inner slider component */
-  private getInnerActivePosition(componentEl: HTMLElement):
-    | { index: number; count: number; activeEl: HTMLElement | null }
-    | null {
+  private getInnerActivePosition(
+    componentEl: HTMLElement
+  ): { index: number; count: number; activeEl: HTMLElement | null } | null {
     const swiperEl = componentEl.querySelector<HTMLElement>('.swiper');
     const wrapper = swiperEl?.querySelector<HTMLElement>('.swiper-wrapper');
     if (!wrapper) return null;
