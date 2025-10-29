@@ -13,56 +13,59 @@
  * - Dialogs use the Dialog component elsewhere in the codebase; we call
  *   showModal/close directly and dispatch matched custom events for parity.
  */
+// TODO: refactor to remove usage of Swiper.js from inside the <dialog> element. Shall be easier with custom JS
 import { gsapHorizontalDraggableLoop } from '$utils/gsap-draggable-loop-slider';
+
+const SECTION_SELECTOR = '.section_stories';
+const sectionList = document.querySelectorAll(SECTION_SELECTOR);
 
 class StorySlider {
   private readonly COMPONENT_SELECTOR = '[data-slider-el="component"]';
   private readonly NAV_PREV_BUTTON_SELECTOR = '[data-slider-el="nav-prev"]';
   private readonly NAV_NEXT_BUTTON_SELECTOR = '[data-slider-el="nav-next"]';
 
-  private readonly SECTION_SELECTOR = '.section_stories';
   private readonly STORIES_ITEM_SELECTOR = '.stories_item';
 
   private readonly ACTIVE_SLIDE_CLASS = 'is-active';
 
-  constructor() {
+  private sectionEl: HTMLElement;
+  private storyItemsList: HTMLElement[];
+  private storyItemCount: number = 0;
+
+  constructor(sectionEl: HTMLElement) {
     console.info('[StorySlider] init');
+    this.sectionEl = sectionEl;
+    this.storyItemsList = Array.from(this.sectionEl.querySelectorAll(this.STORIES_ITEM_SELECTOR));
+    this.storyItemCount = this.storyItemsList.length;
+
+    if (!this.storyItemCount) {
+      console.warn('[StorySlider] no story items found');
+      return;
+    }
+
     this.initDraggableMainSlider();
     this.bindInnerSliderBoundaryClicks();
   }
 
   private initDraggableMainSlider() {
-    const sectionEl = document.querySelector(this.SECTION_SELECTOR);
-    if (!sectionEl) {
-      console.warn('[StorySlider] no stories section found');
-      return;
-    }
-
-    const storyItemsList = Array.from(sectionEl.querySelectorAll(this.STORIES_ITEM_SELECTOR));
-
-    if (storyItemsList.length === 0) {
-      console.warn('[StorySlider] no story items found');
-      return;
-    }
-
-    let activeElement: HTMLElement | null;
-    const loop = gsapHorizontalDraggableLoop(storyItemsList, {
+    let activeSlide: HTMLElement | null;
+    const loop = gsapHorizontalDraggableLoop(this.storyItemsList, {
       paused: true,
-      draggable: storyItemsList.length > 6 ? true : false, // make it draggable
-      center: true, // active element is the one in the center of the container rather than th left edge
-      onChange: (element, index) => {
-        // when the active element changes, this function gets called.
-        activeElement && activeElement.classList.remove(this.ACTIVE_SLIDE_CLASS);
-        element.classList.add(this.ACTIVE_SLIDE_CLASS);
-        activeElement = element;
+      draggable: true,
+      center: true,
+      onChange: (slide, index) => {
+        // when the active slide changes
+        activeSlide && activeSlide.classList.remove(this.ACTIVE_SLIDE_CLASS);
+        slide.classList.add(this.ACTIVE_SLIDE_CLASS);
+        activeSlide = slide;
       },
     });
 
-    sectionEl
-      .querySelector(this.NAV_NEXT_BUTTON_SELECTOR)
+    this.sectionEl
+      .querySelector(`${this.NAV_NEXT_BUTTON_SELECTOR}:not(.story-modal_nav-button)`)
       ?.addEventListener('click', () => loop.next({ duration: 0.4, ease: 'power1.inOut' }));
-    sectionEl
-      .querySelector(this.NAV_PREV_BUTTON_SELECTOR)
+    this.sectionEl
+      .querySelector(`${this.NAV_PREV_BUTTON_SELECTOR}:not(.story-modal_nav-button)`)
       ?.addEventListener('click', () => loop.previous({ duration: 0.4, ease: 'power1.inOut' }));
   }
 
@@ -137,47 +140,17 @@ class StorySlider {
       return;
     }
 
-    const outerSwiper = currentDialog.closest<HTMLElement>('.swiper');
-    const currentOuterSlide = currentDialog.closest<HTMLElement>('.swiper-slide');
-
-    let targetSlide: HTMLElement | null = null;
-
-    if (outerSwiper && currentOuterSlide) {
-      const wrapper = outerSwiper.querySelector<HTMLElement>('.swiper-wrapper');
-      const slides = wrapper
-        ? (Array.from(wrapper.children).filter(
-            (el) =>
-              (el as HTMLElement).classList?.contains('swiper-slide') &&
-              !(el as HTMLElement).classList?.contains('swiper-slide-duplicate')
-          ) as HTMLElement[])
-        : [];
-
-      let currentIndex = slides.indexOf(currentOuterSlide);
-      if (currentIndex === -1) {
-        const raw = currentOuterSlide.getAttribute('data-swiper-slide-index');
-        const origIdx = raw ? Number.parseInt(raw, 10) : NaN;
-        if (!Number.isNaN(origIdx)) currentIndex = origIdx;
-      }
-
-      const delta = dir === 'next' ? 1 : -1;
-      const targetIndex = currentIndex + delta;
-      targetSlide = slides[targetIndex] ?? null;
-
-      console.debug('[StorySlider] seeking target via indexed siblings', {
-        dir,
-        found: !!targetSlide,
-        currentIndex,
-        targetIndex,
-        slidesCount: slides.length,
-      });
+    let nextStoryItem;
+    const currentStoryItem = currentDialog.closest(this.STORIES_ITEM_SELECTOR) as HTMLElement;
+    const currentStoryItemPos = this.storyItemsList.indexOf(currentStoryItem);
+    if (currentStoryItemPos === this.storyItemCount - 1) {
+      // if last item, loop to first
+      nextStoryItem = this.storyItemsList[0];
+    } else {
+      nextStoryItem = this.storyItemsList[currentStoryItemPos + 1];
     }
 
-    if (!targetSlide) {
-      console.warn('[StorySlider] no target outer slide found', { dir });
-      return;
-    }
-
-    const targetDialog = targetSlide.querySelector<HTMLDialogElement>('dialog[data-dialog-id]');
+    const targetDialog = nextStoryItem.querySelector<HTMLDialogElement>('dialog[data-dialog-id]');
     if (!targetDialog) {
       console.warn('[StorySlider] target slide has no dialog', { dir, targetSlide });
       return;
@@ -250,5 +223,7 @@ console.info('[StorySlider] script loaded');
 // Initialize after Webflow is ready to ensure DOM is stable
 window.Webflow = window.Webflow || [];
 window.Webflow.push(() => {
-  new StorySlider();
+  sectionList.forEach((sectionEl) => {
+    new StorySlider(sectionEl);
+  });
 });
