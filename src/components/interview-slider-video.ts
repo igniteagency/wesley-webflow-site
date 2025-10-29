@@ -15,6 +15,7 @@ class InterviewVideoPlayer {
 
   private observer: IntersectionObserver;
   private videoInstances: Map<HTMLElement, any> = new Map();
+  private currentlyPlaying: HTMLElement | null = null;
 
   constructor() {
     this.observer = new IntersectionObserver(
@@ -46,7 +47,8 @@ class InterviewVideoPlayer {
       this.observer.observe(wrap);
     });
 
-    console.debug('[InterviewVideo] Observing', videoWraps.length, 'video wraps');
+    window.IS_DEBUG_MODE &&
+      console.debug('[InterviewVideo] Observing', videoWraps.length, 'video wraps');
   }
 
   private async initializeVideo(wrap: HTMLElement): Promise<void> {
@@ -121,6 +123,7 @@ class InterviewVideoPlayer {
         if (isClickPlaying) {
           // Already playing with audio, pause it
           isClickPlaying = false;
+          this.currentlyPlaying = null;
           wrap.classList.remove(this.CLASS_CLICK_PLAYING);
           wrap.classList.add(this.CLASS_CLICK_PAUSED);
 
@@ -131,8 +134,14 @@ class InterviewVideoPlayer {
             console.error('[InterviewVideo] Error pausing on click:', err);
           }
         } else {
+          // Pause any other currently playing video
+          if (this.currentlyPlaying && this.currentlyPlaying !== wrap) {
+            this.currentlyPlaying.click();
+          }
+
           // Start playing with audio
           isClickPlaying = true;
+          this.currentlyPlaying = wrap;
           wrap.classList.remove(this.CLASS_HOVER_PLAYING);
           wrap.classList.remove(this.CLASS_CLICK_PAUSED);
           wrap.classList.add(this.CLASS_CLICK_PLAYING);
@@ -145,6 +154,7 @@ class InterviewVideoPlayer {
             console.error('[InterviewVideo] Error playing on click:', err);
             // Revert state on error
             isClickPlaying = false;
+            this.currentlyPlaying = null;
             wrap.classList.remove(this.CLASS_CLICK_PLAYING);
           }
         }
@@ -153,11 +163,14 @@ class InterviewVideoPlayer {
       // Listen for video ending to reset state
       player.on('ended', () => {
         isClickPlaying = false;
+        if (this.currentlyPlaying === wrap) {
+          this.currentlyPlaying = null;
+        }
         wrap.classList.remove(this.CLASS_CLICK_PLAYING);
         wrap.classList.remove(this.CLASS_CLICK_PAUSED);
       });
 
-      console.debug('[InterviewVideo] Player initialized for', videoUrl);
+      window.IS_DEBUG_MODE && console.debug('[InterviewVideo] Player initialized for', videoUrl);
     } catch (error) {
       console.error('[InterviewVideo] Error initializing video:', error);
     }
@@ -175,8 +188,6 @@ class InterviewVideoPlayer {
     this.videoInstances.clear();
   }
 }
-
-console.debug('[InterviewVideo] Script loaded');
 
 window.loadScript('https://player.vimeo.com/api/player.js', { name: 'vimeo-sdk' });
 
