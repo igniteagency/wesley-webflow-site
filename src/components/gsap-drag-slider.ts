@@ -161,7 +161,7 @@ class GSAPDragSlider {
   }
 }
 
-document.addEventListener('scriptLoaded', () => {
+window.Webflow?.push(() => {
   document.querySelectorAll(COMPONENT_SELECTOR).forEach((componentEl) => {
     new GSAPDragSlider(componentEl);
   });
