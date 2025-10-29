@@ -3,7 +3,7 @@
  * To create standalone sliders on the page, add swiper script and this component script to the page
  */
 
-class Slider {
+class SwiperSlider {
   COMPONENT_SELECTOR = '[data-slider-el="component"]';
   NAV_PREV_BUTTON_SELECTOR = '[data-slider-el="nav-prev"]';
   NAV_NEXT_BUTTON_SELECTOR = '[data-slider-el="nav-next"]';
@@ -146,5 +146,5 @@ window.loadScript('https://cdn.jsdelivr.net/npm/swiper@12/swiper-bundle.min.js',
 });
 
 document.addEventListener('scriptLoaded:swiper', () => {
-  new Slider();
+  new SwiperSlider();
 });
