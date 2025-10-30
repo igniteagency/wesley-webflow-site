@@ -90,6 +90,19 @@ class InterviewVideoPlayer {
       // Track playing states
       let isClickPlaying = false;
 
+      // Pause function
+      const pauseVideo = async () => {
+        if (!isClickPlaying) return;
+        isClickPlaying = false;
+        this.currentlyPlaying = null;
+        wrap.classList.remove(this.CLASS_CLICK_PLAYING);
+        wrap.classList.add(this.CLASS_CLICK_PAUSED);
+        await player.pause();
+      };
+
+      // Store pause function for cross-instance calls
+      this.videoInstances.set(wrap, { player, pauseVideo });
+
       // Hover handlers
       wrap.addEventListener('mouseenter', async () => {
         // Don't interfere if already playing with audio
@@ -121,22 +134,14 @@ class InterviewVideoPlayer {
       // Click handler
       wrap.addEventListener('click', async () => {
         if (isClickPlaying) {
-          // Already playing with audio, pause it
-          isClickPlaying = false;
-          this.currentlyPlaying = null;
-          wrap.classList.remove(this.CLASS_CLICK_PLAYING);
-          wrap.classList.add(this.CLASS_CLICK_PAUSED);
-
-          try {
-            await player.pause();
-            // Video stays paused until user hovers out and back in
-          } catch (err) {
-            console.error('[InterviewVideo] Error pausing on click:', err);
-          }
+          await pauseVideo();
         } else {
           // Pause any other currently playing video
           if (this.currentlyPlaying && this.currentlyPlaying !== wrap) {
-            this.currentlyPlaying.click();
+            const instance = this.videoInstances.get(this.currentlyPlaying);
+            if (instance?.pauseVideo) {
+              await instance.pauseVideo();
+            }
           }
 
           // Start playing with audio
@@ -152,7 +157,6 @@ class InterviewVideoPlayer {
             await player.play();
           } catch (err) {
             console.error('[InterviewVideo] Error playing on click:', err);
-            // Revert state on error
             isClickPlaying = false;
             this.currentlyPlaying = null;
             wrap.classList.remove(this.CLASS_CLICK_PLAYING);
