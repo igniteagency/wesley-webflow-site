@@ -1,0 +1,1 @@
+"use strict";(()=>{function A(){let s=".navbar_menu-link-list",e=".navbar_menu-link",t=gsap.parseEase("sine.out");document.querySelectorAll(s).forEach((o,L)=>{let n=o.querySelectorAll(e);n.forEach((a,r)=>{let i=r/(n.length-1),c=t(i)*(n.length-1)*70;a.style.setProperty("--i",`${c}`)})})}})();
