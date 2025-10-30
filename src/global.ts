@@ -1,5 +1,6 @@
 import { animatedDetailsAccordions } from '$components/accordions';
 import Dialog from '$components/dialog';
+import { initNavAnimation, initNavScrollBehavior } from '$components/nav';
 import { setCurrentYear } from '$utils/current-year';
 import { initCursorFollow } from '$utils/cursor-follow';
 import '$utils/disable-webflow-scroll';
@@ -16,6 +17,9 @@ window.Webflow?.push(() => {
     window.WF_IX = Webflow.require('ix3');
     console.debug('Webflow IX3 globalised:', window.WF_IX);
   }, 100);
+
+  initNavScrollBehavior();
+  initNavAnimation();
 
   // Set current year on respective elements
   setCurrentYear();
