@@ -1,3 +1,22 @@
+export function initNavScrollBehavior() {
+  const NAVBAR_WRAPPER_SELECTOR = '.navbar_wrapper';
+  const SCROLLED_CLASS = 'is-scrolled';
+
+  const navbarWrapper = document.querySelector(NAVBAR_WRAPPER_SELECTOR);
+  if (!navbarWrapper) {
+    console.debug('[Nav] No navbar wrapper found');
+    return;
+  }
+
+  ScrollTrigger.create({
+    trigger: document.body,
+    start: 100,
+    toggleClass: { targets: navbarWrapper, className: SCROLLED_CLASS },
+    id: 'nav-scroll-toggle',
+    markers: window.IS_DEBUG_MODE,
+  });
+}
+
 export function initNavAnimation() {
   const NAV_LINKS_LIST_SELECTOR = '.navbar_menu-link-list';
   const NAV_LINKS_SELECTOR = '.navbar_menu-link';
