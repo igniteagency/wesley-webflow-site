@@ -4,6 +4,7 @@ import type ScrollSmoother from 'gsap/ScrollSmoother';
 import type ScrollTrigger from 'gsap/ScrollTrigger';
 import type SplitText from 'gsap/SplitText';
 import type jQuery from 'jquery';
+import type Player from '@vimeo/player';
 import type { ScriptOptions } from 'src/entry';
 
 import type { SCRIPTS_ENV } from '$dev/env';
@@ -67,6 +68,11 @@ declare global {
     smoother: ScrollSmoother;
 
     jQuery: typeof jQuery;
+
+    /** Vimeo Player API */
+    Vimeo?: {
+      Player: typeof Player;
+    };
   }
 
   // Extend `querySelector` and `querySelectorAll` function
