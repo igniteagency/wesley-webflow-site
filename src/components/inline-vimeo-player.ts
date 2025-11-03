@@ -5,13 +5,17 @@
  * - Plays muted video on hover
  * - Plays video with audio on click
  */
+import type { VimeoUrl } from '@vimeo/player';
 
-class InterviewVideoPlayer {
+class InlineVimeoPlayer {
   private readonly VIDEO_WRAP_SELECTOR = '[data-interview-video-el]';
   private readonly VIDEO_URL_ATTR = 'data-video-url';
-  private readonly CLASS_HOVER_PLAYING = 'is-hover-playing';
-  private readonly CLASS_CLICK_PLAYING = 'is-click-playing';
-  private readonly CLASS_CLICK_PAUSED = 'is-click-paused';
+
+  private readonly PLAY_STATE_ATTR = 'data-play-state';
+  private readonly PLAY_STATE_HOVER = 'hover';
+  private readonly PLAY_STATE_PLAYING = 'playing';
+  private readonly PLAY_STATE_PAUSED = 'paused';
+  private readonly PLAY_STATE_NONE = 'none';
 
   private observer: IntersectionObserver;
   private videoInstances: Map<HTMLElement, any> = new Map();
@@ -27,7 +31,7 @@ class InterviewVideoPlayer {
         });
       },
       {
-        rootMargin: '500px', // Start loading when 200px away from viewport
+        rootMargin: '500px', // Start loading when x px away from viewport
         threshold: 0,
       }
     );
@@ -39,7 +43,7 @@ class InterviewVideoPlayer {
     const videoWraps = document.querySelectorAll(this.VIDEO_WRAP_SELECTOR);
 
     if (videoWraps.length === 0) {
-      console.debug('[InterviewVideo] No video wraps found');
+      console.debug('[InlineVimeoPlayer] No video wraps found');
       return;
     }
 
@@ -48,7 +52,30 @@ class InterviewVideoPlayer {
     });
 
     window.IS_DEBUG_MODE &&
-      console.debug('[InterviewVideo] Observing', videoWraps.length, 'video wraps');
+      console.debug('[InlineVimeoPlayer] Observing', videoWraps.length, 'video wraps');
+  }
+
+  private async fetchThumbnail(videoUrl: string): Promise<string | null> {
+    try {
+      const response = await fetch(
+        `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(videoUrl)}&height=500`
+      );
+
+      if (!response.ok) {
+        window.IS_DEBUG_MODE &&
+          console.error(
+            `[InlineVimeoPlayer] Failed to fetch thumbnail for the video: ${videoUrl}`,
+            response.statusText
+          );
+        return null;
+      }
+
+      const data = await response.json();
+      return data.thumbnail_url || null;
+    } catch (error) {
+      console.error('[InlineVimeoPlayer] Error fetching thumbnail:', error);
+      return null;
+    }
   }
 
   private async initializeVideo(wrap: HTMLElement): Promise<void> {
@@ -62,29 +89,34 @@ class InterviewVideoPlayer {
 
     const videoUrl = wrap.getAttribute(this.VIDEO_URL_ATTR);
     if (!videoUrl) {
-      console.error('[InterviewVideo] No video URL found on wrap', wrap);
+      console.error('[InlineVimeoPlayer] No video URL found on wrap', wrap);
       return;
     }
 
+    // Fetch and apply thumbnail before initializing player
+    const thumbnailUrl = await this.fetchThumbnail(videoUrl);
+    wrap.style.setProperty('--thumb', `url('${thumbnailUrl}')`);
+
     // Check if Vimeo API is available
-    const VimeoGlobal: any = (window as any).Vimeo;
-    if (!VimeoGlobal || !VimeoGlobal.Player) {
-      console.error('[InterviewVideo] Vimeo API not available');
+    if (!window.Vimeo?.Player) {
+      console.error('[InlineVimeoPlayer] Vimeo API not available');
       return;
     }
 
     try {
       // Create player as frameless (background) video
-      const player: any = new VimeoGlobal.Player(wrap, {
-        url: videoUrl,
+      const player = new window.Vimeo.Player(wrap, {
+        url: videoUrl as VimeoUrl,
         background: true, // Frameless video without controls
         muted: true,
-        autoplay: false,
+        autoplay: true,
         loop: true,
       });
 
       await player.ready();
+      await player.setCurrentTime(1); // Load first frame
       await player.pause(); // Ensure paused initially
+
       this.videoInstances.set(wrap, player);
 
       // Track playing states
@@ -95,8 +127,7 @@ class InterviewVideoPlayer {
         if (!isClickPlaying) return;
         isClickPlaying = false;
         this.currentlyPlaying = null;
-        wrap.classList.remove(this.CLASS_CLICK_PLAYING);
-        wrap.classList.add(this.CLASS_CLICK_PAUSED);
+        wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PAUSED);
         await player.pause();
       };
 
@@ -108,26 +139,24 @@ class InterviewVideoPlayer {
         // Don't interfere if already playing with audio
         if (isClickPlaying) return;
 
-        wrap.classList.remove(this.CLASS_CLICK_PAUSED);
-        wrap.classList.add(this.CLASS_HOVER_PLAYING);
         try {
           await player.setMuted(true);
           await player.play();
+          wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_HOVER);
         } catch (err) {
-          console.error('[InterviewVideo] Error playing on hover:', err);
-          wrap.classList.remove(this.CLASS_HOVER_PLAYING);
+          console.error('[InlineVimeoPlayer] Error playing on hover:', err);
         }
       });
 
       wrap.addEventListener('mouseleave', async () => {
-        // Don't interfere if playing with audio from click
-        if (isClickPlaying) return;
+        // Don't interfere if playing with audio from click or already paused
+        if (isClickPlaying || (await player.getPaused())) return;
 
-        wrap.classList.remove(this.CLASS_HOVER_PLAYING);
+        wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
         try {
           await player.pause();
         } catch (err) {
-          console.error('[InterviewVideo] Error pausing on hover leave:', err);
+          console.error('[InlineVimeoPlayer] Error pausing on hover leave:', err);
         }
       });
 
@@ -147,19 +176,16 @@ class InterviewVideoPlayer {
           // Start playing with audio
           isClickPlaying = true;
           this.currentlyPlaying = wrap;
-          wrap.classList.remove(this.CLASS_HOVER_PLAYING);
-          wrap.classList.remove(this.CLASS_CLICK_PAUSED);
-          wrap.classList.add(this.CLASS_CLICK_PLAYING);
 
           try {
+            wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PLAYING);
             await player.setMuted(false);
             await player.setVolume(1);
             await player.play();
           } catch (err) {
-            console.error('[InterviewVideo] Error playing on click:', err);
+            console.error('[InlineVimeoPlayer] Error playing on click:', err);
             isClickPlaying = false;
             this.currentlyPlaying = null;
-            wrap.classList.remove(this.CLASS_CLICK_PLAYING);
           }
         }
       });
@@ -170,13 +196,12 @@ class InterviewVideoPlayer {
         if (this.currentlyPlaying === wrap) {
           this.currentlyPlaying = null;
         }
-        wrap.classList.remove(this.CLASS_CLICK_PLAYING);
-        wrap.classList.remove(this.CLASS_CLICK_PAUSED);
+        wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
       });
 
-      window.IS_DEBUG_MODE && console.debug('[InterviewVideo] Player initialized for', videoUrl);
+      window.IS_DEBUG_MODE && console.debug('[InlineVimeoPlayer] Player initialized for', videoUrl);
     } catch (error) {
-      console.error('[InterviewVideo] Error initializing video:', error);
+      console.error('[InlineVimeoPlayer] Error initializing video:', error);
     }
   }
 
@@ -186,7 +211,7 @@ class InterviewVideoPlayer {
       try {
         player.destroy();
       } catch (err) {
-        console.error('[InterviewVideo] Error destroying player:', err);
+        console.error('[InlineVimeoPlayer] Error destroying player:', err);
       }
     });
     this.videoInstances.clear();
@@ -198,14 +223,14 @@ window.loadScript('https://player.vimeo.com/api/player.js', { name: 'vimeo-sdk' 
 // Initialize after Webflow is ready and Vimeo API is available
 window.Webflow = window.Webflow || [];
 window.Webflow.push(() => {
-  const hasVimeo = !!(window as any).Vimeo?.Player;
+  const hasVimeo = !!window.Vimeo?.Player;
   if (hasVimeo) {
-    new InterviewVideoPlayer();
+    new InlineVimeoPlayer();
   } else {
     document.addEventListener(
       'scriptLoaded:vimeo-sdk',
       () => {
-        new InterviewVideoPlayer();
+        new InlineVimeoPlayer();
       },
       { once: true }
     );
