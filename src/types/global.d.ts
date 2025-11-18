@@ -1,6 +1,5 @@
 import type { Webflow } from '@finsweet/ts-utils';
 import type GSAP from 'gsap';
-import type ScrollSmoother from 'gsap/ScrollSmoother';
 import type ScrollTrigger from 'gsap/ScrollTrigger';
 import type SplitText from 'gsap/SplitText';
 import type jQuery from 'jquery';
@@ -27,7 +26,6 @@ declare global {
   gsap: GSAP;
   ScrollTrigger: typeof ScrollTrigger;
   SplitText: typeof SplitText;
-  ScrollSmoother: typeof ScrollSmoother;
 
   /** Swiper JS global types */
   declare const Swiper: typeof import('swiper').default;
