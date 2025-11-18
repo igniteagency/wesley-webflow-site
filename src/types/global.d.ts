@@ -1,6 +1,5 @@
 import type { Webflow } from '@finsweet/ts-utils';
 import type GSAP from 'gsap';
-import type ScrollSmoother from 'gsap/ScrollSmoother';
 import type ScrollTrigger from 'gsap/ScrollTrigger';
 import type SplitText from 'gsap/SplitText';
 import type jQuery from 'jquery';
@@ -27,7 +26,6 @@ declare global {
   gsap: GSAP;
   ScrollTrigger: typeof ScrollTrigger;
   SplitText: typeof SplitText;
-  ScrollSmoother: typeof ScrollSmoother;
 
   /** Swiper JS global types */
   declare const Swiper: typeof import('swiper').default;
@@ -64,8 +62,14 @@ declare global {
       attr?: Record<string, string>
     ) => Promise<void>;
 
-    // Custom Scripts
-    smoother: ScrollSmoother;
+    loadCSS: (url: string) => Promise<void>;
+
+    /**
+     * Conditionally load a script if a selector is found on the page
+     * @param selector CSS selector to check for existence
+     * @param url Internal or third party URL of the script to load. Directly feeds into loadScript
+     */
+    conditionalLoadScript: (selector: string, url: string) => void;
 
     jQuery: typeof jQuery;
 
