@@ -64,8 +64,14 @@ declare global {
       attr?: Record<string, string>
     ) => Promise<void>;
 
-    // Custom Scripts
-    smoother: ScrollSmoother;
+    loadCSS: (url: string) => Promise<void>;
+
+    /**
+     * Conditionally load a script if a selector is found on the page
+     * @param selector CSS selector to check for existence
+     * @param url Internal or third party URL of the script to load. Directly feeds into loadScript
+     */
+    conditionalLoadScript: (selector: string, url: string) => void;
 
     jQuery: typeof jQuery;
 
