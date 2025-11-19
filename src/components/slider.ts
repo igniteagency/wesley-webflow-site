@@ -116,7 +116,7 @@ class SwiperSlider {
         centeredSlides,
         watchSlidesProgress: true,
         autoplay: {
-          delay: 50000,
+          delay: 15000,
           disableOnInteraction: false,
         },
         navigation: navigationConfig,
@@ -124,7 +124,7 @@ class SwiperSlider {
         slideActiveClass: 'is-active',
         slidePrevClass: 'is-previous',
         slideNextClass: 'is-next',
-        nested,
+        // nested,
         // Prevent passive event warnings on nested content
         touchStartPreventDefault: false,
         a11y: {
@@ -133,13 +133,32 @@ class SwiperSlider {
         // Optional progress CSS var update (no-op if not used)
         on: {
           autoplayTimeLeft: (_swiper: any, _time: number, progress: number) => {
-            swiperComponent.style.setProperty('--progress', String(1 - progress));
+            requestAnimationFrame(() => {
+              swiperComponent.style.setProperty('--progress', String(1 - progress));
+            });
           },
         },
       });
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (!instance.autoplay) return;
+            if (entry.isIntersecting) {
+              instance.autoplay.start();
+            } else {
+              instance.autoplay.stop();
+            }
+          });
+        },
+        { threshold: 0.2 }
+      );
+      observer.observe(swiperComponent);
     });
   }
 }
+
+window.loadCSS('https://cdn.jsdelivr.net/npm/swiper@12/swiper-bundle.min.css');
 
 window.loadScript('https://cdn.jsdelivr.net/npm/swiper@12/swiper-bundle.min.js', {
   name: 'swiper',
