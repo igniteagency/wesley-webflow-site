@@ -9,8 +9,6 @@ import handleExternalLinks from '$utils/external-link';
 import addMainElementId from '$utils/main-element-id';
 import { duplicateMarqueeList } from '$utils/marquee-list';
 
-gsap.registerPlugin(ScrollTrigger);
-
 window.Webflow = window.Webflow || [];
 window.Webflow?.push(() => {
   setTimeout(() => {
