@@ -8,6 +8,8 @@ class SwiperSlider {
   NAV_PREV_BUTTON_SELECTOR = '[data-slider-el="nav-prev"]';
   NAV_NEXT_BUTTON_SELECTOR = '[data-slider-el="nav-next"]';
   PAGINATION_SELECTOR = '[data-slider-el="pagination"], .swiper-pagination';
+  
+  CUSTOM_EFFECT_ATTR = 'data-slider-effect';
 
   swiperComponents: NodeListOf<HTMLElement> | [];
   swiper: Swiper | null;
@@ -51,9 +53,9 @@ class SwiperSlider {
       ).find((el) => el.closest(this.COMPONENT_SELECTOR) === swiperComponent) ||
         null) as HTMLElement | null;
       const bulletClass =
-        paginationEl?.getAttribute('data-bullet-class') || 'swiper-pagination-bullet';
+        paginationEl?.getAttribute('data-bullet-class') || 'slider_pagination-bullet';
       const bulletActiveClass =
-        paginationEl?.getAttribute('data-bullet-active-class') || 'swiper-pagination-bullet-active';
+        paginationEl?.getAttribute('data-bullet-active-class') || 'is-active';
       const paginationConfig = paginationEl
         ? {
             el: paginationEl,
@@ -62,6 +64,12 @@ class SwiperSlider {
             bulletActiveClass,
           }
         : false;
+
+      let effect = 'slide';
+      const effectAttr = swiperComponent.getAttribute(this.CUSTOM_EFFECT_ATTR);
+      if (effectAttr !== null && effectAttr !== undefined) {
+        effect = effectAttr.trim().toLowerCase();
+      }
 
       // Mark nested sliders so Swiper handles events properly
       const nested = !!swiperEl.parentElement?.closest('.swiper');
@@ -113,6 +121,14 @@ class SwiperSlider {
           ? 'auto'
           : (slidesPerView as number | 'auto'),
         speed: 1000,
+        effect,
+        coverflowEffect: {
+          rotate: 25,
+          stretch: 0,
+          depth: 100,
+          modifier: 1,
+          slideShadows: true,
+        },
         centeredSlides,
         watchSlidesProgress: true,
         autoplay: {
