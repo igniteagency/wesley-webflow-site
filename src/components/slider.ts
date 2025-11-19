@@ -8,6 +8,8 @@ class SwiperSlider {
   NAV_PREV_BUTTON_SELECTOR = '[data-slider-el="nav-prev"]';
   NAV_NEXT_BUTTON_SELECTOR = '[data-slider-el="nav-next"]';
   PAGINATION_SELECTOR = '[data-slider-el="pagination"], .swiper-pagination';
+  
+  CUSTOM_EFFECT_ATTR = 'data-slider-effect';
 
   swiperComponents: NodeListOf<HTMLElement> | [];
   swiper: Swiper | null;
@@ -51,9 +53,9 @@ class SwiperSlider {
       ).find((el) => el.closest(this.COMPONENT_SELECTOR) === swiperComponent) ||
         null) as HTMLElement | null;
       const bulletClass =
-        paginationEl?.getAttribute('data-bullet-class') || 'swiper-pagination-bullet';
+        paginationEl?.getAttribute('data-bullet-class') || 'slider_pagination-bullet';
       const bulletActiveClass =
-        paginationEl?.getAttribute('data-bullet-active-class') || 'swiper-pagination-bullet-active';
+        paginationEl?.getAttribute('data-bullet-active-class') || 'is-active';
       const paginationConfig = paginationEl
         ? {
             el: paginationEl,
@@ -62,6 +64,12 @@ class SwiperSlider {
             bulletActiveClass,
           }
         : false;
+
+      let effect = 'slide';
+      const effectAttr = swiperComponent.getAttribute(this.CUSTOM_EFFECT_ATTR);
+      if (effectAttr !== null && effectAttr !== undefined) {
+        effect = effectAttr.trim().toLowerCase();
+      }
 
       // Mark nested sliders so Swiper handles events properly
       const nested = !!swiperEl.parentElement?.closest('.swiper');
@@ -113,10 +121,18 @@ class SwiperSlider {
           ? 'auto'
           : (slidesPerView as number | 'auto'),
         speed: 1000,
+        effect,
+        coverflowEffect: {
+          rotate: 25,
+          stretch: 0,
+          depth: 100,
+          modifier: 1,
+          slideShadows: true,
+        },
         centeredSlides,
         watchSlidesProgress: true,
         autoplay: {
-          delay: 50000,
+          delay: 15000,
           disableOnInteraction: false,
         },
         navigation: navigationConfig,
@@ -124,7 +140,7 @@ class SwiperSlider {
         slideActiveClass: 'is-active',
         slidePrevClass: 'is-previous',
         slideNextClass: 'is-next',
-        nested,
+        // nested,
         // Prevent passive event warnings on nested content
         touchStartPreventDefault: false,
         a11y: {
@@ -133,13 +149,32 @@ class SwiperSlider {
         // Optional progress CSS var update (no-op if not used)
         on: {
           autoplayTimeLeft: (_swiper: any, _time: number, progress: number) => {
-            swiperComponent.style.setProperty('--progress', String(1 - progress));
+            requestAnimationFrame(() => {
+              swiperComponent.style.setProperty('--progress', String(1 - progress));
+            });
           },
         },
       });
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (!instance.autoplay) return;
+            if (entry.isIntersecting) {
+              instance.autoplay.start();
+            } else {
+              instance.autoplay.stop();
+            }
+          });
+        },
+        { threshold: 0.2 }
+      );
+      observer.observe(swiperComponent);
     });
   }
 }
+
+window.loadCSS('https://cdn.jsdelivr.net/npm/swiper@12/swiper-bundle.min.css');
 
 window.loadScript('https://cdn.jsdelivr.net/npm/swiper@12/swiper-bundle.min.js', {
   name: 'swiper',
