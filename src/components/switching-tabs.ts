@@ -11,6 +11,7 @@ export class AutoRotatingTabs {
   private autoplayTimer: number;
   private intersectionObserver: IntersectionObserver;
   private isInView: boolean = false;
+  private mediaQuery: MediaQueryList;
 
   private readonly AUTOPLAY_TIMER_CSS_VAR = '--autoplay-timer';
   private readonly OUT_OF_VIEW_CLASS = 'is-out-of-view';
@@ -18,6 +19,7 @@ export class AutoRotatingTabs {
 
   constructor(component: HTMLElement) {
     this.component = component;
+    this.mediaQuery = window.matchMedia('(min-width: 992px)');
     this.tabs = Array.from(component.querySelectorAll<HTMLDetailsElement>('details'));
 
     const timerValue = getComputedStyle(component)
@@ -44,9 +46,25 @@ export class AutoRotatingTabs {
   }
 
   private init(): void {
-    this.openTabAtCurrentIndex(); // open the first tab
     this.setupEventListeners();
-    this.setupIntersectionObserver();
+    this.openTabAtCurrentIndex();
+
+    // Initial check
+    if (this.mediaQuery.matches) {
+      this.setupIntersectionObserver();
+    }
+
+    // Listen for changes
+    this.mediaQuery.addEventListener('change', (e) => {
+      if (e.matches) {
+        this.setupIntersectionObserver();
+      } else {
+        this.pauseAutoRotation();
+        if (this.intersectionObserver) {
+          this.intersectionObserver.disconnect();
+        }
+      }
+    });
   }
 
   private setupEventListeners(): void {
@@ -133,6 +151,7 @@ export class AutoRotatingTabs {
   }
 
   private startAutoRotation(): void {
+    if (!this.mediaQuery.matches) return;
     if (!this.isInView) return;
 
     this.pauseAutoRotation();
