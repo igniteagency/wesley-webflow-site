@@ -43,6 +43,7 @@ function UIFunctions() {
 
   // Counter Loader
   window.conditionalLoadScript('[data-el="counter"]', 'components/counter.js');
+  window.conditionalLoadScript('[data-el="content-modal"]', 'components/content-modal.js');
 }
 
 function webflowOverrides() {
