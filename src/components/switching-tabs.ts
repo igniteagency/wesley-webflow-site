@@ -31,6 +31,10 @@ export class AutoRotatingTabs {
       this.autoplayTimer = parseFloat(timerValue) * 1000;
     }
 
+    if (!this.autoplayTimer) {
+      this.autoplayTimer = 6000;
+    }
+
     if (!component || this.tabs.length === 0) {
       console.warn('AutoRotatingTabs: No valid component or tabs found.');
       return;

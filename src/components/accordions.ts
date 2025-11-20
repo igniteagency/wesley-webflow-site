@@ -1,4 +1,4 @@
-const ITEM_SELECTOR = 'details:not([data-accordion="false"])';
+const ITEM_SELECTOR = 'details:not([data-accordion="false"], [data-group="tab"])';
 const TOGGLE_SELECTOR = 'summary';
 const CONTENT_SELECTOR = 'summary + div';
 
