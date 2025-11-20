@@ -8,8 +8,9 @@ class SwiperSlider {
   NAV_PREV_BUTTON_SELECTOR = '[data-slider-el="nav-prev"]';
   NAV_NEXT_BUTTON_SELECTOR = '[data-slider-el="nav-next"]';
   PAGINATION_SELECTOR = '[data-slider-el="pagination"], .swiper-pagination';
-  
+
   CUSTOM_EFFECT_ATTR = 'data-slider-effect';
+  CUSTOM_GAP_ATTR = 'data-slider-gap';
 
   swiperComponents: NodeListOf<HTMLElement> | [];
   swiper: Swiper | null;
@@ -71,6 +72,10 @@ class SwiperSlider {
         effect = effectAttr.trim().toLowerCase();
       }
 
+      if (effectAttr === 'left-stack') {
+        effect = 'creative';
+      }
+
       // Mark nested sliders so Swiper handles events properly
       const nested = !!swiperEl.parentElement?.closest('.swiper');
 
@@ -114,9 +119,13 @@ class SwiperSlider {
         }
       }
 
+      // Per-instance gap from wrapper attribute (default 32)
+      const gapAttr = wrapperEl?.getAttribute(this.CUSTOM_GAP_ATTR);
+      const gap = gapAttr !== null && gapAttr !== undefined ? Number.parseFloat(gapAttr) : 32;
+
       const instance = new Swiper(swiperEl, {
         loop,
-        spaceBetween,
+        spaceBetween: gap,
         slidesPerView: Number.isNaN(slidesPerView as number)
           ? 'auto'
           : (slidesPerView as number | 'auto'),
@@ -129,10 +138,22 @@ class SwiperSlider {
           modifier: 1,
           slideShadows: true,
         },
+        creativeEffect: {
+          limitProgress: 2,
+          prev: {
+            translate: ['-10%', 0, 0],
+            scale: 0.9,
+            origin: 'center center',
+            opacity: 0.8,
+          },
+          next: {
+            translate: ['100%', 0, 0],
+          },
+        },
         centeredSlides,
         watchSlidesProgress: true,
         autoplay: {
-          delay: 15000,
+          delay: 10000,
           disableOnInteraction: false,
         },
         navigation: navigationConfig,
@@ -152,6 +173,17 @@ class SwiperSlider {
             requestAnimationFrame(() => {
               swiperComponent.style.setProperty('--progress', String(1 - progress));
             });
+          },
+        },
+        breakpoints: {
+          320: {
+            spaceBetween: gap / 2,
+          },
+          600: {
+            spaceBetween: gap / 1.5,
+          },
+          992: {
+            spaceBetween: gap,
           },
         },
       });

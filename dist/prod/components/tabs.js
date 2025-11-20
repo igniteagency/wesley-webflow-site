@@ -1,0 +1,1 @@
+"use strict";(()=>{function o(){document.querySelectorAll('[data-el="tabs-component"]').forEach(e=>{e.querySelector("summary")?.addEventListener("click",t=>{e.open&&t.preventDefault()}),e.addEventListener("toggle",()=>{window.innerWidth<787&&e.open&&setTimeout(()=>{e.scrollIntoView({behavior:"smooth"})},1)})})}window.Webflow=window.Webflow||[];window.Webflow.push(o);})();
