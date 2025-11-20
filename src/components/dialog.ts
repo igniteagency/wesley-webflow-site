@@ -12,6 +12,8 @@ class Dialog {
   private readonly DATA_ATTR_CLOSE = 'data-dialog-close';
   private readonly DATA_COMPONENT_SELECTOR = `dialog[${this.DATA_ATTR}]`;
 
+  private initializedIds = new Set<string>();
+
   constructor() {
     this.init();
     this.handleBackdropClick();
@@ -27,6 +29,13 @@ class Dialog {
         return;
       }
 
+      if (this.initializedIds.has(id)) {
+        console.warn(`Duplicate dialog ID "${id}" found. Skipping initialization.`, dialogEl);
+        return;
+      }
+
+      this.initializedIds.add(id);
+
       const openTriggersList = document.querySelectorAll(`[${this.DATA_ATTR_OPEN}="${id}"]`);
       const closeTriggersList = dialogEl.querySelectorAll(`[${this.DATA_ATTR_CLOSE}="${id}"]`);
 
@@ -37,9 +46,15 @@ class Dialog {
       });
 
       closeTriggersList.forEach((closeTriggerEl) => {
-        closeTriggerEl.addEventListener('click', () => {
+        closeTriggerEl.addEventListener('click', (e) => {
+          e.stopPropagation();
           this.closeDialog(dialogEl);
         });
+      });
+
+      // Handle native close event (e.g. when user presses Esc key)
+      dialogEl.addEventListener('close', (event) => {
+        this.closeDialog(dialogEl, true);
       });
     });
   }
@@ -54,8 +69,10 @@ class Dialog {
     dialogEl.dispatchEvent(dialogOpenEvent);
   }
 
-  private closeDialog(dialogEl: HTMLDialogElement) {
-    dialogEl.close();
+  private closeDialog(dialogEl: HTMLDialogElement, isAutoClosing = false) {
+    if (!isAutoClosing) {
+      dialogEl.close();
+    }
 
     // new custom event
     const dialogCloseEvent = new CustomEvent('dialogClose', {
