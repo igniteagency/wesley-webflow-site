@@ -44,7 +44,6 @@ class ContentModal {
       const direction = customEvent.detail.direction;
       if (!direction) return;
 
-      console.debug('[ContentModal] sliderJump', { direction, modal });
       this.handleScroll(container, direction);
     });
   }
@@ -64,7 +63,6 @@ class ContentModal {
           container.dispatchEvent(
             new CustomEvent('storyHandoff', { bubbles: true, detail: { direction: 'next' } })
           );
-          console.debug('[ContentModal] storyHandoff', { container, direction });
           return;
         }
 
