@@ -50,6 +50,9 @@ export function initCursorFollow(): void {
     const moveX = gsap.quickTo(follower, 'x', { duration: 0.25, ease: 'power3.out' });
     const moveY = gsap.quickTo(follower, 'y', { duration: 0.25, ease: 'power3.out' });
 
+    const cssX = gsap.quickSetter(container, '--x', 'px');
+    const cssY = gsap.quickSetter(container, '--y', 'px');
+
     let primed = false;
 
     function clamp(val: number, min: number, max: number): number {
@@ -77,6 +80,7 @@ export function initCursorFollow(): void {
       updateRect();
       updateSize();
       const { x, y } = localXY(e);
+      gsap.set(container, { '--x': x, '--y': y });
       gsap.set(follower, { x, y });
       gsap.to(follower, { opacity: 1, duration: 0.25, ease: 'power3.out' });
       primed = true;
@@ -84,17 +88,22 @@ export function initCursorFollow(): void {
 
     container.addEventListener('pointermove', (e: PointerEvent) => {
       const { x, y } = localXY(e);
+
       if (!primed) {
         gsap.set(follower, { x, y });
+        gsap.set(container, { '--x': x, '--y': y });
         primed = true;
         return;
       }
       moveX(x);
       moveY(y);
+      cssX(x);
+      cssY(y);
     });
 
     container.addEventListener('pointerleave', () => {
       gsap.to(follower, { opacity: 0, duration: 0.2, ease: 'power3.in' });
+      gsap.set(container, { '--x': '50%', '--y': '50%' });
       primed = false;
     });
   });
