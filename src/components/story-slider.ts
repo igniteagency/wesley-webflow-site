@@ -33,7 +33,7 @@ class StorySlider {
   private storyItemCount: number = 0;
 
   constructor(sectionEl: HTMLElement) {
-    console.info('[StorySlider] init');
+    window.IS_DEBUG_MODE && console.info('[StorySlider] init');
     this.sectionEl = sectionEl;
     this.storyItemsList = Array.from(this.sectionEl.querySelectorAll(this.STORIES_ITEM_SELECTOR));
     this.storyItemCount = this.storyItemsList.length;
@@ -44,7 +44,15 @@ class StorySlider {
     }
 
     this.initDraggableMainSlider();
-    this.bindInnerSliderBoundaryClicks();
+
+    this.sectionEl.querySelectorAll('dialog').forEach((dialogEl) => {
+      dialogEl.addEventListener('storyHandoff', (e: Event) => {
+        const customEvent = e as CustomEvent;
+        const target = customEvent.target as HTMLElement;
+        const direction = customEvent.detail.direction;
+        this.handoffToAdjacentStory(target, direction);
+      });
+    });
   }
 
   private initDraggableMainSlider() {
@@ -69,67 +77,6 @@ class StorySlider {
       ?.addEventListener('click', () => loop.previous({ duration: 0.4, ease: 'power1.inOut' }));
   }
 
-  /** Binds click handlers on inner slider nav buttons inside dialogs */
-  private bindInnerSliderBoundaryClicks() {
-    const innerSliderComponents = document.querySelectorAll<HTMLElement>(
-      `dialog[data-dialog-id] ${this.COMPONENT_SELECTOR}`
-    );
-    console.info(
-      `[StorySlider] inner sliders inside dialogs found: ${innerSliderComponents.length}`
-    );
-
-    innerSliderComponents.forEach((componentEl, idx) => {
-      console.debug('[StorySlider] binding inner slider', { idx, componentEl });
-      componentEl.addEventListener('click', (evt) => {
-        const target = evt.target as HTMLElement | null;
-        if (!target) return;
-
-        // Check for next/prev button clicks via closest() to allow nested icons
-        const nextBtn = target.closest(this.NAV_NEXT_BUTTON_SELECTOR) as HTMLElement | null;
-        const prevBtn = target.closest(this.NAV_PREV_BUTTON_SELECTOR) as HTMLElement | null;
-
-        // Ensure the found button belongs to this component
-        const isWithinThisComponent = (btn: HTMLElement | null) =>
-          !!btn && btn.closest(this.COMPONENT_SELECTOR) === componentEl;
-
-        if (isWithinThisComponent(nextBtn)) {
-          const disabled = this.isNavDisabled(nextBtn);
-          const pos = this.getInnerActivePosition(componentEl);
-          const atLast = !!pos && pos.index === pos.count - 1;
-          console.log('[StorySlider] next clicked', { idx, disabled, atLast, nextBtn });
-          if (atLast) {
-            evt.preventDefault();
-            evt.stopPropagation();
-            this.handoffToAdjacentStory(componentEl, 'next');
-          }
-          return;
-        }
-
-        if (isWithinThisComponent(prevBtn)) {
-          const disabled = this.isNavDisabled(prevBtn);
-          const pos = this.getInnerActivePosition(componentEl);
-          const atFirst = !!pos && pos.index === 0;
-          console.log('[StorySlider] prev clicked', { idx, disabled, atFirst, prevBtn });
-          if (atFirst) {
-            evt.preventDefault();
-            evt.stopPropagation();
-            this.handoffToAdjacentStory(componentEl, 'prev');
-          }
-          return;
-        }
-      });
-    });
-  }
-
-  /** Determines nav disabled via class or ARIA */
-  private isNavDisabled(btn: HTMLElement): boolean {
-    return (
-      btn.classList.contains('is-disabled') ||
-      btn.getAttribute('aria-disabled') === 'true' ||
-      btn.hasAttribute('disabled')
-    );
-  }
-
   /**
    * Close current dialog and open the dialog inside adjacent (next/prev) outer slide
    */
@@ -143,48 +90,48 @@ class StorySlider {
     let nextStoryItem;
     const currentStoryItem = currentDialog.closest(this.STORIES_ITEM_SELECTOR) as HTMLElement;
     const currentStoryItemPos = this.storyItemsList.indexOf(currentStoryItem);
-    if (currentStoryItemPos === this.storyItemCount - 1) {
-      // if last item, loop to first
-      nextStoryItem = this.storyItemsList[0];
+    if (dir === 'next') {
+      if (currentStoryItemPos === this.storyItemCount - 1) {
+        // if last item, loop to first
+        nextStoryItem = this.storyItemsList[0];
+      } else {
+        nextStoryItem = this.storyItemsList[currentStoryItemPos + 1];
+      }
     } else {
-      nextStoryItem = this.storyItemsList[currentStoryItemPos + 1];
+      if (currentStoryItemPos === 0) {
+        // if first item, loop to last
+        nextStoryItem = this.storyItemsList[this.storyItemCount - 1];
+      } else {
+        nextStoryItem = this.storyItemsList[currentStoryItemPos - 1];
+      }
     }
 
     const targetDialog = nextStoryItem.querySelector<HTMLDialogElement>('dialog[data-dialog-id]');
     if (!targetDialog) {
-      console.warn('[StorySlider] target slide has no dialog', { dir, targetSlide });
+      console.warn('[StorySlider] target slide has no dialog', { dir });
       return;
     }
 
     // Close current and open target
-    console.log('[StorySlider] handoff', {
-      dir,
-      fromDialog: currentDialog.getAttribute('data-dialog-id'),
-      toDialog: targetDialog.getAttribute('data-dialog-id'),
-    });
-    this.closeDialog(currentDialog);
+    window.IS_DEBUG_MODE &&
+      console.log('[StorySlider] handoff', {
+        dir,
+        fromDialog: currentDialog.getAttribute('data-dialog-id'),
+        toDialog: targetDialog.getAttribute('data-dialog-id'),
+      });
     this.openDialog(targetDialog);
-  }
+    this.closeDialog(currentDialog);
 
-  /** Get current active slide index and total for an inner slider component */
-  private getInnerActivePosition(
-    componentEl: HTMLElement
-  ): { index: number; count: number; activeEl: HTMLElement | null } | null {
-    const swiperEl = componentEl.querySelector<HTMLElement>('.swiper');
-    const wrapper = swiperEl?.querySelector<HTMLElement>('.swiper-wrapper');
-    if (!wrapper) return null;
-    const slides = Array.from(
-      wrapper.querySelectorAll<HTMLElement>('.swiper-slide:not(.swiper-slide-duplicate)')
-    );
-    const count = slides.length;
-    if (count === 0) return { index: 0, count: 0, activeEl: null };
-
-    // Prefer custom class from slider.ts, fallback to Swiper default
-    let activeEl = wrapper.querySelector<HTMLElement>('.swiper-slide.is-active');
-    if (!activeEl) activeEl = wrapper.querySelector<HTMLElement>('.swiper-slide-active');
-
-    const index = slides.findIndex((s) => s === activeEl);
-    return { index: index < 0 ? 0 : index, count, activeEl };
+    // jump slides in the target dialog
+    if (dir === 'next') {
+      targetDialog.dispatchEvent(
+        new CustomEvent('sliderJump', { bubbles: true, detail: { direction: 'first' } })
+      );
+    } else {
+      targetDialog.dispatchEvent(
+        new CustomEvent('sliderJump', { bubbles: true, detail: { direction: 'last' } })
+      );
+    }
   }
 
   /** Mirror Dialog component's open behavior and custom event */
@@ -218,7 +165,7 @@ class StorySlider {
 }
 
 // Quick confirmation the script file itself loaded
-console.info('[StorySlider] script loaded');
+window.IS_DEBUG_MODE && console.info('[StorySlider] script loaded');
 
 // Initialize after Webflow is ready to ensure DOM is stable
 window.Webflow = window.Webflow || [];
