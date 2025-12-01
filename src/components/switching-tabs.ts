@@ -12,12 +12,14 @@ export class AutoRotatingTabs {
   private intersectionObserver: IntersectionObserver;
   private isInView: boolean = false;
   private mediaQuery: MediaQueryList;
+  private abortController: AbortController;
 
   private readonly AUTOPLAY_TIMER_CSS_VAR = '--autoplay-timer';
   private readonly OUT_OF_VIEW_CLASS = 'is-out-of-view';
   private readonly TAB_CLOSING_CLASS = 'is-closing';
 
   constructor(component: HTMLElement) {
+    this.abortController = new AbortController();
     this.component = component;
     this.mediaQuery = window.matchMedia('(min-width: 992px)');
     this.tabs = Array.from(component.querySelectorAll<HTMLDetailsElement>('details'));
@@ -55,32 +57,39 @@ export class AutoRotatingTabs {
     }
 
     // Listen for changes
-    this.mediaQuery.addEventListener('change', (e) => {
-      if (e.matches) {
-        this.setupIntersectionObserver();
-      } else {
-        this.pauseAutoRotation();
-        if (this.intersectionObserver) {
-          this.intersectionObserver.disconnect();
+    this.mediaQuery.addEventListener(
+      'change',
+      (e) => {
+        if (e.matches) {
+          this.setupIntersectionObserver();
+        } else {
+          this.pauseAutoRotation();
+          if (this.intersectionObserver) {
+            this.intersectionObserver.disconnect();
+          }
         }
-      }
-    });
+      },
+      { signal: this.abortController.signal }
+    );
   }
 
   private setupEventListeners(): void {
     this.tabs.forEach((tab, index) => {
       const toggle = tab.querySelector('summary') as HTMLElement;
-      toggle.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopImmediatePropagation();
+      toggle.addEventListener(
+        'click',
+        (event) => {
+          event.preventDefault();
 
-        if (index === this.currentTabIndex || tab.open) {
-          return;
-        }
+          if (index === this.currentTabIndex || tab.open) {
+            return;
+          }
 
-        this.currentTabIndex = index;
-        this.openTabAtCurrentIndex();
-      });
+          this.currentTabIndex = index;
+          this.openTabAtCurrentIndex();
+        },
+        { signal: this.abortController.signal }
+      );
     });
   }
 
@@ -110,23 +119,24 @@ export class AutoRotatingTabs {
   private openTabAtCurrentIndex(): void {
     const el = this.tabs[this.currentTabIndex];
     const content = el.querySelector('summary + div') as HTMLElement;
+    const wasOpen = el.open;
     el.open = true;
     this.startAutoRotation();
+    this.closeOtherTabs();
 
     const height = content.scrollHeight;
-    gsap.fromTo(
-      content,
-      { height: 0 },
-      {
-        height,
-        duration: 0.3,
-        onComplete: () => {
-          gsap.set(content, { height: 'auto' });
-        },
-      }
-    );
 
-    this.closeOtherTabs();
+    if (!wasOpen) {
+      gsap.set(content, { height: 0 });
+    }
+    gsap.to(content, {
+      height,
+      duration: 0.3,
+      overwrite: true,
+      onComplete: () => {
+        gsap.set(content, { height: 'auto' });
+      },
+    });
   }
 
   private closeOtherTabs() {
@@ -134,18 +144,21 @@ export class AutoRotatingTabs {
       if (index !== this.currentTabIndex && tab.open) {
         tab.classList.add(this.TAB_CLOSING_CLASS);
         const content = tab.querySelector('summary + div') as HTMLElement;
-        gsap.fromTo(
-          content,
-          { height: content.scrollHeight },
-          {
-            height: 0,
-            duration: 0.3,
-            onComplete: () => {
-              tab.open = false;
-              tab.classList.remove(this.TAB_CLOSING_CLASS);
-            },
-          }
-        );
+
+        if (!content.style.height || content.style.height === 'auto') {
+          gsap.set(content, { height: content.scrollHeight });
+        }
+
+        gsap.to(content, {
+          height: 0,
+          duration: 0.3,
+          overwrite: true,
+          onComplete: () => {
+            tab.open = false;
+            tab.classList.remove(this.TAB_CLOSING_CLASS);
+            gsap.set(content, { clearProps: 'height' });
+          },
+        });
       }
     });
   }
@@ -176,6 +189,8 @@ export class AutoRotatingTabs {
   }
 
   public destroy(): void {
+    this.abortController.abort();
+
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
@@ -192,7 +207,7 @@ export function initAutoRotatingTabs(): void {
   const tabsComponents = document.querySelectorAll('[data-el="switching-tabs-component"]');
 
   tabsComponents.forEach((component) => {
-    new AutoRotatingTabs(component);
+    new AutoRotatingTabs(component as HTMLElement);
   });
 }
 
