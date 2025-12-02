@@ -161,9 +161,6 @@ class SwiperSlider {
         slideActiveClass: 'is-active',
         slidePrevClass: 'is-previous',
         slideNextClass: 'is-next',
-        // nested,
-        // Prevent passive event warnings on nested content
-        touchStartPreventDefault: false,
         a11y: {
           enabled: true,
         },
