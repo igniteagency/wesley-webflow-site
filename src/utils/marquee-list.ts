@@ -9,7 +9,11 @@ export function duplicateMarqueeList() {
     const marqueeList = el;
     const clone = marqueeList.cloneNode(true) as HTMLElement;
 
+    // Add duplicating class to stop animation until duplication is done
+    marqueeList.classList.add('is-duplicating');
+
     // Insert the clone as the next sibling
     marqueeList.parentNode?.insertBefore(clone, marqueeList.nextSibling);
+    marqueeList.classList.remove('is-duplicating');
   });
 }
