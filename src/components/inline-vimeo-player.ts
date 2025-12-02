@@ -58,7 +58,7 @@ class InlineVimeoPlayer {
   private async fetchThumbnail(videoUrl: string): Promise<string | null> {
     try {
       const response = await fetch(
-        `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(videoUrl)}&height=500`
+        `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(videoUrl)}&height=1920`
       );
 
       if (!response.ok) {
