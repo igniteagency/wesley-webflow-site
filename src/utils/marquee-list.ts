@@ -7,13 +7,18 @@ export function duplicateMarqueeList() {
 
   marqueeLists.forEach((el) => {
     const marqueeList = el;
-    const clone = marqueeList.cloneNode(true) as HTMLElement;
 
     // Add duplicating class to stop animation until duplication is done
-    marqueeList.classList.add('is-duplicating');
+    marqueeList.parentElement?.classList.add('is-duplicating');
+
+    const clone = marqueeList.cloneNode(true) as HTMLElement;
 
     // Insert the clone as the next sibling
     marqueeList.parentNode?.insertBefore(clone, marqueeList.nextSibling);
-    marqueeList.classList.remove('is-duplicating');
+
+    // Remove duplicating class after duplication is done
+    setTimeout(() => {
+      marqueeList.parentElement?.classList.remove('is-duplicating');
+    }, 1);
   });
 }
