@@ -8,9 +8,11 @@ export function initNavScrollBehavior() {
     return;
   }
 
+  const isMobile = window.matchMedia('(max-width: 768px)').matches;
+
   ScrollTrigger.create({
     trigger: document.body,
-    start: 100,
+    start: isMobile ? 30 : 100,
     toggleClass: { targets: navbarWrapper, className: SCROLLED_CLASS },
     id: 'nav-scroll-toggle',
     markers: window.IS_DEBUG_MODE,
