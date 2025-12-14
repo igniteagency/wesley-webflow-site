@@ -110,7 +110,7 @@ class InlineVimeoPlayer {
         background: true, // Frameless video without controls
         muted: true,
         autoplay: true,
-        loop: true,
+        loop: false,
       });
 
       await player.ready();
