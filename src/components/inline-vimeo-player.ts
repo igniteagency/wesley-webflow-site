@@ -181,6 +181,7 @@ class InlineVimeoPlayer {
             wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PLAYING);
             await player.setMuted(false);
             await player.setVolume(1);
+            await player.setCurrentTime(0);
             await player.play();
           } catch (err) {
             console.error('[InlineVimeoPlayer] Error playing on click:', err);
