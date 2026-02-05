@@ -13,7 +13,9 @@ export function initNavScrollBehavior() {
   ScrollTrigger.create({
     trigger: document.body,
     start: isMobile ? 30 : 100,
+    end: 99999,
     toggleClass: { targets: navbarWrapper, className: SCROLLED_CLASS },
+    invalidateOnRefresh: true,
     id: 'nav-scroll-toggle',
     markers: window.IS_DEBUG_MODE,
   });
