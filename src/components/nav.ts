@@ -13,7 +13,7 @@ export function initNavScrollBehavior() {
   ScrollTrigger.create({
     trigger: document.body,
     start: isMobile ? 30 : 100,
-    end: 99999,
+    end: 'max', // Use max instead of a fixed huge number so markers don't artificially expand the page
     toggleClass: { targets: navbarWrapper, className: SCROLLED_CLASS },
     invalidateOnRefresh: true,
     id: 'nav-scroll-toggle',
