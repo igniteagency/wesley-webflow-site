@@ -5,7 +5,9 @@
   "type": "module",
   "main": "src/entry.js",
   "module": "src/entry.js",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "author": "parasshah195",
   "scripts": {
     "dev": "cross-env NODE_ENV=development bun run ./bin/build.js",
@@ -29,6 +31,7 @@
     "eslint-plugin-prettier": "^5.5.4",
     "gsap": "^3.13.0",
     "path": "^0.12.7",
+    "playwright": "^1.58.2",
     "prettier": "^3.6.2",
     "swiper": "^11.2.10",
     "tiny-glob": "^0.2.9",

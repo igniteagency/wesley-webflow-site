@@ -1,28 +1,26 @@
-/**
- * Cursor-follow utility
- *
- * Usage:
- * - Wrap the interactive area with `[data-cursor-follow="container"]`
- * - Place the follower element inside with `[data-cursor-follow="element"]`
- * - Only runs for fine pointers (e.g., mouse/trackpad)
- */
-
 export function initCursorFollow(): void {
   if (!window.matchMedia('(pointer: fine)').matches) return;
 
   const containers = document.querySelectorAll<HTMLElement>('[data-cursor-follow="container"]');
 
   containers.forEach((container) => {
-    const follower = container.querySelector<HTMLElement>('[data-cursor-follow="element"]');
-    if (!follower) return;
+    // Limits element within the parent boundaries
+    let isClamp = true;
+    if (container.getAttribute('data-cursor-follow-clamp') === 'false') {
+      isClamp = false;
+    }
 
-    gsap.set(follower, {
+    const followers = gsap.utils.toArray<HTMLElement>(
+      container.querySelectorAll('[data-cursor-follow="element"]')
+    );
+    if (followers.length === 0) return;
+
+    gsap.set(followers, {
       position: 'absolute',
       top: 0,
       left: 0,
       xPercent: -50,
       yPercent: -50,
-      // Keep native size; manage visibility with opacity only
       scale: 1,
       opacity: 0,
       transformOrigin: '50% 50%',
@@ -33,22 +31,35 @@ export function initCursorFollow(): void {
 
     let rect = container.getBoundingClientRect();
     const updateRect = () => (rect = container.getBoundingClientRect());
-    window.addEventListener('resize', updateRect);
-    window.addEventListener('scroll', updateRect, { passive: true });
 
     // Follower size
-    let followerW = follower.offsetWidth;
-    let followerH = follower.offsetHeight;
+    let followerW = 0;
+    let followerH = 0;
     const updateSize = () => {
-      followerW = follower.offsetWidth;
-      followerH = follower.offsetHeight;
+      const activeFollower = followers.find((f) => f.offsetWidth > 0) || followers[0];
+      followerW = activeFollower.offsetWidth;
+      followerH = activeFollower.offsetHeight;
     };
-    window.addEventListener('resize', updateSize);
+
+    // Initial sync
+    updateRect();
+    updateSize();
+
+    window.addEventListener('resize', () => {
+      updateRect();
+      updateSize();
+    });
+    window.addEventListener('scroll', updateRect, { passive: true });
 
     const margin = 16; // px padding from edge
 
-    const moveX = gsap.quickTo(follower, 'x', { duration: 0.25, ease: 'power3.out' });
-    const moveY = gsap.quickTo(follower, 'y', { duration: 0.25, ease: 'power3.out' });
+    // Create quickTo for each follower to ensure high performance
+    const moveXFns = followers.map((f) =>
+      gsap.quickTo(f, 'x', { duration: 0.25, ease: 'power3.out' })
+    );
+    const moveYFns = followers.map((f) =>
+      gsap.quickTo(f, 'y', { duration: 0.25, ease: 'power3.out' })
+    );
 
     const cssX = gsap.quickSetter(container, '--x', 'px');
     const cssY = gsap.quickSetter(container, '--y', 'px');
@@ -65,13 +76,18 @@ export function initCursorFollow(): void {
       let y = e.clientY - rect.top;
 
       // Clamp so follower stays fully visible
-      const minX = followerW / 2 + margin;
-      const maxX = rect.width - followerW / 2 - margin;
-      const minY = followerH / 2 + margin;
-      const maxY = rect.height - followerH / 2 - margin;
+      if (isClamp) {
+        const minX = followerW / 2 + margin;
+        const maxX = rect.width - followerW / 2 - margin;
+        const minY = followerH / 2 + margin;
+        const maxY = rect.height - followerH / 2 - margin;
 
-      x = clamp(x, minX, maxX);
-      y = clamp(y, minY, maxY);
+        // Safety check if rect is 0
+        if (rect.width > 0) {
+          x = clamp(x, minX, maxX);
+          y = clamp(y, minY, maxY);
+        }
+      }
 
       return { x, y };
     }
@@ -81,8 +97,8 @@ export function initCursorFollow(): void {
       updateSize();
       const { x, y } = localXY(e);
       gsap.set(container, { '--x': x, '--y': y });
-      gsap.set(follower, { x, y });
-      gsap.to(follower, { opacity: 1, duration: 0.25, ease: 'power3.out' });
+      gsap.set(followers, { x, y });
+      gsap.to(followers, { opacity: 1, duration: 0.25, ease: 'power3.out' });
       primed = true;
     });
 
@@ -90,19 +106,19 @@ export function initCursorFollow(): void {
       const { x, y } = localXY(e);
 
       if (!primed) {
-        gsap.set(follower, { x, y });
+        gsap.set(followers, { x, y });
         gsap.set(container, { '--x': x, '--y': y });
         primed = true;
         return;
       }
-      moveX(x);
-      moveY(y);
+      moveXFns.forEach((fn) => fn(x));
+      moveYFns.forEach((fn) => fn(y));
       cssX(x);
       cssY(y);
     });
 
     container.addEventListener('pointerleave', () => {
-      gsap.to(follower, { opacity: 0, duration: 0.2, ease: 'power3.in' });
+      gsap.to(followers, { opacity: 0, duration: 0.2, ease: 'power3.in' });
       gsap.set(container, { '--x': '50%', '--y': '50%' });
       primed = false;
     });
