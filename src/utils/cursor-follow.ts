@@ -1,11 +1,15 @@
-
-
 export function initCursorFollow(): void {
   if (!window.matchMedia('(pointer: fine)').matches) return;
 
   const containers = document.querySelectorAll<HTMLElement>('[data-cursor-follow="container"]');
 
   containers.forEach((container) => {
+    // Limits element within the parent boundaries
+    let isClamp = true;
+    if (container.getAttribute('data-cursor-follow-clamp') === 'false') {
+      isClamp = false;
+    }
+
     const followers = gsap.utils.toArray<HTMLElement>(
       container.querySelectorAll('[data-cursor-follow="element"]')
     );
@@ -81,6 +85,17 @@ export function initCursorFollow(): void {
       if (rect.width > 0) {
         x = clamp(x, minX, maxX);
         y = clamp(y, minY, maxY);
+      if (isClamp) {
+        const minX = followerW / 2 + margin;
+        const maxX = rect.width - followerW / 2 - margin;
+        const minY = followerH / 2 + margin;
+        const maxY = rect.height - followerH / 2 - margin;
+
+        // Safety check if rect is 0
+        if (rect.width > 0) {
+          x = clamp(x, minX, maxX);
+          y = clamp(y, minY, maxY);
+        }
       }
 
       return { x, y };
@@ -118,4 +133,3 @@ export function initCursorFollow(): void {
     });
   });
 }
-
