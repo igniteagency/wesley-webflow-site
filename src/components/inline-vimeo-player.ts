@@ -148,31 +148,37 @@ class InlineVimeoPlayer {
       this.videoInstances.set(wrap, { player, pauseVideo });
 
       if (isInterviewReel) {
-        // Hover handlers
-        wrap.addEventListener('mouseenter', async () => {
-          // Don't interfere if already playing with audio
-          if (isClickPlaying) return;
+        // Only add hover handlers if primary input supports fine pointing (mouse/trackpad)
+        // Avoids interference with touch-only devices, works correctly on hybrid devices too
+        const canHover = !window.matchMedia('(pointer: coarse)').matches;
 
-          try {
-            await player.setMuted(true);
-            await player.play();
-            wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_HOVER);
-          } catch (err) {
-            console.error('[InlineVimeoPlayer] Error playing on hover:', err);
-          }
-        });
+        if (canHover) {
+          // Hover handlers (desktop only)
+          wrap.addEventListener('mouseenter', async () => {
+            // Don't interfere if already playing with audio
+            if (isClickPlaying) return;
 
-        wrap.addEventListener('mouseleave', async () => {
-          // Don't interfere if playing with audio from click or already paused
-          if (isClickPlaying || (await player.getPaused())) return;
+            try {
+              await player.setMuted(true);
+              await player.play();
+              wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_HOVER);
+            } catch (err) {
+              console.error('[InlineVimeoPlayer] Error playing on hover:', err);
+            }
+          });
 
-          wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
-          try {
-            await player.pause();
-          } catch (err) {
-            console.error('[InlineVimeoPlayer] Error pausing on hover leave:', err);
-          }
-        });
+          wrap.addEventListener('mouseleave', async () => {
+            // Don't interfere if playing with audio from click or already paused
+            if (isClickPlaying || (await player.getPaused())) return;
+
+            wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
+            try {
+              await player.pause();
+            } catch (err) {
+              console.error('[InlineVimeoPlayer] Error pausing on hover leave:', err);
+            }
+          });
+        }
 
         // Click handler
         wrap.addEventListener('click', async () => {
@@ -193,9 +199,11 @@ class InlineVimeoPlayer {
 
             try {
               wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PLAYING);
-              await player.setMuted(false);
-              await player.setVolume(1);
               await player.setCurrentTime(0);
+              await player.setMuted(false);
+              // Small delay ensures browser has registered unmute before play
+              await new Promise((resolve) => setTimeout(resolve, 50));
+              await player.setVolume(1);
               await player.play();
             } catch (err) {
               console.error('[InlineVimeoPlayer] Error playing on click:', err);
