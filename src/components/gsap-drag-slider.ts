@@ -49,8 +49,8 @@ class GSAPDragSlider {
     this.slider = gsapHorizontalDraggableLoop(this.slidesList, {
       paused: true,
       draggable: true,
-      center: true,
-      onChange: (slide, index) => {
+      center: this.componentEl,
+      onChange: (slide: HTMLElement, index: number) => {
         // when the active slide changes
         this.activeSlide && this.activeSlide.classList.remove(this.ACTIVE_SLIDE_CLASS);
         slide.classList.add(this.ACTIVE_SLIDE_CLASS);
@@ -97,7 +97,7 @@ class GSAPDragSlider {
       dot.className = this.PAGINATION_BULLET_CLASS;
       dot.setAttribute('aria-label', `Go to slide ${index + 1}`);
       dot.addEventListener('click', () => {
-        this.slider.goToIndex(index, { duration: 0.4, ease: 'power1.inOut' });
+        this.slider.toIndex(index, { duration: 0.4, ease: 'power1.inOut' });
       });
       this.paginationEl?.appendChild(dot);
 

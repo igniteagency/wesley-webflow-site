@@ -60,7 +60,7 @@ class StorySlider {
     const loop = gsapHorizontalDraggableLoop(this.storyItemsList, {
       paused: true,
       draggable: true,
-      center: true,
+      center: this.sectionEl,
       onChange: (slide, index) => {
         // when the active slide changes
         activeSlide && activeSlide.classList.remove(this.ACTIVE_SLIDE_CLASS);
