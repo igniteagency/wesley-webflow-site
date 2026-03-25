@@ -74,8 +74,6 @@ export function initCursorFollow(): void {
       // Raw coords relative to container
       let x = e.clientX - rect.left;
       let y = e.clientY - rect.top;
-
-      // Clamp so follower stays fully visible
       if (isClamp) {
         const minX = followerW / 2 + margin;
         const maxX = rect.width - followerW / 2 - margin;
