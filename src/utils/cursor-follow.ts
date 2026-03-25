@@ -74,32 +74,20 @@ export function initCursorFollow(): void {
       // Raw coords relative to container
       let x = e.clientX - rect.left;
       let y = e.clientY - rect.top;
+      if (isClamp) {
+        const minX = followerW / 2 + margin;
+        const maxX = rect.width - followerW / 2 - margin;
+        const minY = followerH / 2 + margin;
+        const maxY = rect.height - followerH / 2 - margin;
 
-      // Clamp so follower stays fully visible
-      const minX = followerW / 2 + margin;
-      const maxX = rect.width - followerW / 2 - margin;
-      const minY = followerH / 2 + margin;
-      const maxY = rect.height - followerH / 2 - margin;
-
-      // Safety check if rect is 0
-      if (rect.width > 0) {
-        x = clamp(x, minX, maxX);
-        y = clamp(y, minY, maxY);
-        if (isClamp) {
-          const minX = followerW / 2 + margin;
-          const maxX = rect.width - followerW / 2 - margin;
-          const minY = followerH / 2 + margin;
-          const maxY = rect.height - followerH / 2 - margin;
-
-          // Safety check if rect is 0
-          if (rect.width > 0) {
-            x = clamp(x, minX, maxX);
-            y = clamp(y, minY, maxY);
-          }
+        // Safety check if rect is 0
+        if (rect.width > 0) {
+          x = clamp(x, minX, maxX);
+          y = clamp(y, minY, maxY);
         }
-
-        return { x, y };
       }
+
+      return { x, y };
     }
 
     container.addEventListener('pointerenter', (e: PointerEvent) => {
