@@ -200,11 +200,11 @@ class InlineVimeoPlayer {
             try {
               wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PLAYING);
               await player.setCurrentTime(0);
-              await player.setMuted(false);
-              // Small delay ensures browser has registered unmute before play
-              await new Promise((resolve) => setTimeout(resolve, 50));
-              await player.setVolume(1);
+              // On iOS, play() must be called before setMuted(false) and without delays
+              // This maintains the "trusted user gesture" context required by iOS
               await player.play();
+              await player.setMuted(false);
+              await player.setVolume(1);
             } catch (err) {
               console.error('[InlineVimeoPlayer] Error playing on click:', err);
               isClickPlaying = false;
