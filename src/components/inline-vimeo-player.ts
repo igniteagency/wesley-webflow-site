@@ -21,25 +21,12 @@ class InlineVimeoPlayer {
   private readonly PLAY_STATE_PAUSED = 'paused';
   private readonly PLAY_STATE_NONE = 'none';
 
-  private observer: IntersectionObserver;
+  private observer: IntersectionObserver | null = null;
   private videoInstances: Map<HTMLElement, any> = new Map();
   private currentlyPlaying: HTMLElement | null = null;
 
   constructor() {
-    this.observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            this.initializeVideo(entry.target as HTMLElement);
-          }
-        });
-      },
-      {
-        rootMargin: '500px', // Start loading when x px away from viewport
-        threshold: 0,
-      }
-    );
-
+    this.observer = null;
     this.initializeAll();
   }
 
@@ -51,12 +38,45 @@ class InlineVimeoPlayer {
       return;
     }
 
+    // Create observer
+    this.observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const target = entry.target as HTMLElement;
+            if (target.tagName === 'SECTION') {
+              target
+                .querySelectorAll(this.VIDEO_WRAP_SELECTOR)
+                .forEach((wrap) => this.initializeVideo(wrap as HTMLElement));
+              this.observer!.unobserve(target);
+            }
+          }
+        });
+      },
+      { rootMargin: '500px', threshold: 0 }
+    );
+
+    // Group videos by parent section
+    const sectionMap = new Map<HTMLElement, HTMLElement[]>();
     videoWraps.forEach((wrap) => {
-      this.observer.observe(wrap);
+      const section = wrap.closest('section') as HTMLElement;
+      if (section) {
+        if (!sectionMap.has(section)) sectionMap.set(section, []);
+        sectionMap.get(section)!.push(wrap);
+      } else {
+        this.initializeVideo(wrap);
+      }
+    });
+
+    // Observe sections
+    sectionMap.forEach((videos, section) => {
+      this.observer!.observe(section);
+      window.IS_DEBUG_MODE &&
+        console.debug(`[InlineVimeoPlayer] Observing section with ${videos.length} videos`);
     });
 
     window.IS_DEBUG_MODE &&
-      console.debug('[InlineVimeoPlayer] Observing', videoWraps.length, 'video wraps');
+      console.debug('[InlineVimeoPlayer] Observing', sectionMap.size, 'sections total');
   }
 
   private async fetchThumbnail(videoUrl: string): Promise<string | null> {
@@ -81,156 +101,163 @@ class InlineVimeoPlayer {
       return null;
     }
   }
+  private async pauseVideo(wrap: HTMLElement): Promise<void> {
+    const instance = this.videoInstances.get(wrap);
+    const player = instance?.player;
+    const videoUrl = wrap.getAttribute(this.VIDEO_URL_ATTR);
+
+    if (!player) {
+      console.warn('[InlineVimeoPlayer] No player instance found for wrap:', wrap);
+      return;
+    }
+
+    await player.pause();
+    instance.isClickPlaying = false;
+    wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PAUSED);
+    window.IS_DEBUG_MODE && console.debug('[InlineVimeoPlayer] Paused video:', videoUrl);
+
+    if (this.currentlyPlaying === wrap) {
+      this.currentlyPlaying = null;
+    }
+  }
 
   private async initializeVideo(wrap: HTMLElement): Promise<void> {
-    // Stop observing once we start initializing
-    this.observer.unobserve(wrap);
-
-    // Check if already initialized
-    if (this.videoInstances.has(wrap)) {
-      return;
-    }
+    if (this.videoInstances.has(wrap)) return;
 
     const videoUrl = wrap.getAttribute(this.VIDEO_URL_ATTR);
-    if (!videoUrl) {
-      console.error('[InlineVimeoPlayer] No video URL found on wrap', wrap);
-      return;
-    }
-
     const isInterviewReel =
       wrap.getAttribute(this.INTERVIEW_VIDEO_ATTR) === this.INTERVIEW_VIDEO_ATTR_VALUE;
-
     const shouldLoop = wrap.getAttribute(this.VIDEO_LOOP_ATTR) === 'true';
     const shouldAutoplay = wrap.getAttribute(this.VIDEO_AUTOPLAY_ATTR) === 'true';
 
-    // Fetch and apply thumbnail before initializing player
-    const thumbnailUrl = await this.fetchThumbnail(videoUrl);
+    const thumbnailUrl = await this.fetchThumbnail(videoUrl!);
     wrap.style.setProperty('--thumb', `url('${thumbnailUrl}')`);
 
-    // Check if Vimeo API is available
-    if (!window.Vimeo?.Player) {
-      console.error('[InlineVimeoPlayer] Vimeo API not available');
-      return;
-    }
+    const canHover = !window.matchMedia('(pointer: coarse)').matches;
 
     try {
-      // Create player as frameless (background) video
       const player = new window.Vimeo.Player(wrap, {
         url: videoUrl as VimeoUrl,
-        background: true, // Frameless video without controls
-        muted: true,
-        autoplay: true,
+        background: canHover, // Background videos on desktop to allow parallel video playing on hover
+        controls: !canHover, // Show controls on mobile to avoid audio issues
+        muted: canHover ? true : shouldAutoplay, // Start muted if autoplay is enabled
+        autoplay: shouldAutoplay,
         loop: shouldLoop,
+        playsinline: true,
       });
 
-      await player.ready();
-      await player.setCurrentTime(1); // Load first frame
+      // SAVE THE OBJECT IMMEDIATELY (Don't set it twice)
+      this.videoInstances.set(wrap, { player, isClickPlaying: false });
 
-      if (!shouldAutoplay) {
-        await player.pause(); // Ensure paused initially
-      }
-
-      this.videoInstances.set(wrap, player);
-
-      // Track playing states
-      let isClickPlaying = false;
-
-      // Pause function
-      const pauseVideo = async () => {
-        if (!isClickPlaying) return;
-        isClickPlaying = false;
-        this.currentlyPlaying = null;
-        wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PAUSED);
-        await player.pause();
-      };
-
-      // Store pause function for cross-instance calls
-      this.videoInstances.set(wrap, { player, pauseVideo });
-
-      if (isInterviewReel) {
-        // Only add hover handlers if primary input supports fine pointing (mouse/trackpad)
-        // Avoids interference with touch-only devices, works correctly on hybrid devices too
-        const canHover = !window.matchMedia('(pointer: coarse)').matches;
-
-        if (canHover) {
-          // Hover handlers (desktop only)
-          wrap.addEventListener('mouseenter', async () => {
-            // Don't interfere if already playing with audio
-            if (isClickPlaying) return;
-
-            try {
-              await player.setMuted(true);
-              await player.play();
-              wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_HOVER);
-            } catch (err) {
-              console.error('[InlineVimeoPlayer] Error playing on hover:', err);
-            }
-          });
-
-          wrap.addEventListener('mouseleave', async () => {
-            // Don't interfere if playing with audio from click or already paused
-            if (isClickPlaying || (await player.getPaused())) return;
-
-            wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
-            try {
-              await player.pause();
-            } catch (err) {
-              console.error('[InlineVimeoPlayer] Error pausing on hover leave:', err);
-            }
-          });
-        }
-
-        // Click handler
-        wrap.addEventListener('click', async () => {
-          if (isClickPlaying) {
-            await pauseVideo();
-          } else {
-            // Pause any other currently playing video
-            if (this.currentlyPlaying && this.currentlyPlaying !== wrap) {
-              const instance = this.videoInstances.get(this.currentlyPlaying);
-              if (instance?.pauseVideo) {
-                await instance.pauseVideo();
-              }
-            }
-
-            // Start playing with audio
-            isClickPlaying = true;
-            this.currentlyPlaying = wrap;
-
-            try {
-              wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PLAYING);
-              await player.setCurrentTime(0);
-              await player.setMuted(false);
-              // Small delay ensures browser has registered unmute before play
-              await new Promise((resolve) => setTimeout(resolve, 50));
-              await player.setVolume(1);
-              await player.play();
-            } catch (err) {
-              console.error('[InlineVimeoPlayer] Error playing on click:', err);
-              isClickPlaying = false;
-              this.currentlyPlaying = null;
-            }
-          }
-        });
-      }
-
-      // Listen for video ending to reset state
-      player.on('ended', () => {
-        isClickPlaying = false;
-        if (this.currentlyPlaying === wrap) {
-          this.currentlyPlaying = null;
+      player.ready().then(() => {
+        if (!shouldAutoplay) {
+          player.setCurrentTime(1);
+          if (canHover) player.setVolume(1);
         }
         wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
       });
 
-      window.IS_DEBUG_MODE && console.debug('[InlineVimeoPlayer] Player initialized for', videoUrl);
+      if (isInterviewReel) {
+        const videoInstance = this.videoInstances.get(wrap);
+
+        if (canHover) {
+          wrap.addEventListener('click', async () => {
+            if (videoInstance.isClickPlaying) {
+              await this.pauseVideo(wrap);
+              return;
+            }
+
+            // Save reference to previously playing video before updating
+            const previouslyPlaying = this.currentlyPlaying;
+
+            videoInstance.isClickPlaying = true;
+            this.currentlyPlaying = wrap;
+            wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PLAYING);
+
+            if (canHover) {
+              player.setMuted(false);
+              player.setVolume(1);
+            }
+
+            const playPromise = player.play();
+
+            // NOW it's safe to await — iOS already received the play postMessage above
+            if (previouslyPlaying && previouslyPlaying !== wrap) {
+              await this.pauseVideo(previouslyPlaying);
+            }
+
+            try {
+              await playPromise;
+              await player.setCurrentTime(0);
+
+              window.IS_DEBUG_MODE &&
+                console.debug('[InlineVimeoPlayer] Playing video with sound:', videoUrl);
+            } catch (err) {
+              console.error('[InlineVimeoPlayer] Play failed:', err);
+              videoInstance.isClickPlaying = false;
+              this.currentlyPlaying = null;
+              wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
+            }
+          });
+
+          wrap.addEventListener('mouseenter', () => {
+            if (videoInstance.isClickPlaying) return;
+            player.setMuted(true);
+            player.play();
+            wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_HOVER);
+            window.IS_DEBUG_MODE &&
+              console.debug('[InlineVimeoPlayer] Hover play (muted):', videoUrl);
+          });
+
+          wrap.addEventListener('mouseleave', () => {
+            if (videoInstance.isClickPlaying) return;
+            player.pause();
+            wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
+            window.IS_DEBUG_MODE && console.debug('[InlineVimeoPlayer] Hover pause:', videoUrl);
+          });
+        } else {
+          // MOBILE: don't intercept the tap — let it hit the iframe directly.
+          // iOS requires the gesture to land on the iframe itself for unmuted audio.
+          // Instead, drive UI state from Vimeo SDK events.
+
+          // Make the wrap transparent to pointer events so taps reach the iframe.
+          // The CSS overlay/thumbnail must also have pointer-events: none on mobile.
+          wrap.style.pointerEvents = 'none';
+
+          // Let the iframe itself be tappable — it fills the wrap
+          const iframe = wrap.querySelector('iframe');
+          if (iframe) (iframe as HTMLElement).style.pointerEvents = 'auto';
+
+          player.on('play', () => {
+            const instance = this.videoInstances.get(wrap);
+            if (!instance) return;
+            instance.isClickPlaying = true;
+            this.currentlyPlaying = wrap;
+            wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PLAYING);
+          });
+
+          player.on('pause', () => {
+            const instance = this.videoInstances.get(wrap);
+            if (!instance) return;
+            instance.isClickPlaying = false;
+            if (this.currentlyPlaying === wrap) this.currentlyPlaying = null;
+            wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PAUSED);
+          });
+        }
+      }
+
+      player.on('ended', () => {
+        this.videoInstances.get(wrap).isClickPlaying = false;
+        if (this.currentlyPlaying === wrap) this.currentlyPlaying = null;
+        wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
+      });
     } catch (error) {
-      console.error('[InlineVimeoPlayer] Error initializing video:', error);
+      console.error('[InlineVimeoPlayer] Init error:', error);
     }
   }
 
   public destroy(): void {
-    this.observer.disconnect();
+    this.observer?.disconnect();
     this.videoInstances.forEach((player) => {
       try {
         player.destroy();
