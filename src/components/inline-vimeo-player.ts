@@ -139,7 +139,7 @@ class InlineVimeoPlayer {
       const player = new window.Vimeo.Player(wrap, {
         url: videoUrl as VimeoUrl,
         background: canHover, // Background videos on desktop to allow parallel video playing on hover
-        controls: false,
+        controls: !canHover, // Show controls on mobile to avoid audio issues
         muted: canHover ? true : shouldAutoplay, // Start muted if autoplay is enabled
         autoplay: shouldAutoplay,
         loop: shouldLoop,
@@ -160,48 +160,46 @@ class InlineVimeoPlayer {
       if (isInterviewReel) {
         const videoInstance = this.videoInstances.get(wrap);
 
-        // CLICK HANDLER (Mobile + Desktop)
-        wrap.addEventListener('click', async () => {
-          if (videoInstance.isClickPlaying) {
-            await this.pauseVideo(wrap);
-            return;
-          }
-
-          // Save reference to previously playing video before updating
-          const previouslyPlaying = this.currentlyPlaying;
-
-          videoInstance.isClickPlaying = true;
-          this.currentlyPlaying = wrap;
-          wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PLAYING);
-
-          if (canHover) {
-            player.setMuted(false);
-            player.setVolume(1);
-          }
-
-          const playPromise = player.play();
-
-          // NOW it's safe to await — iOS already received the play postMessage above
-          if (previouslyPlaying && previouslyPlaying !== wrap) {
-            await this.pauseVideo(previouslyPlaying);
-          }
-
-          try {
-            await playPromise;
-            await player.setCurrentTime(0);
-
-            window.IS_DEBUG_MODE &&
-              console.debug('[InlineVimeoPlayer] Playing video with sound:', videoUrl);
-          } catch (err) {
-            console.error('[InlineVimeoPlayer] Play failed:', err);
-            videoInstance.isClickPlaying = false;
-            this.currentlyPlaying = null;
-            wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
-          }
-        });
-
-        // HOVER HANDLER (Desktop Only)
         if (canHover) {
+          wrap.addEventListener('click', async () => {
+            if (videoInstance.isClickPlaying) {
+              await this.pauseVideo(wrap);
+              return;
+            }
+
+            // Save reference to previously playing video before updating
+            const previouslyPlaying = this.currentlyPlaying;
+
+            videoInstance.isClickPlaying = true;
+            this.currentlyPlaying = wrap;
+            wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PLAYING);
+
+            if (canHover) {
+              player.setMuted(false);
+              player.setVolume(1);
+            }
+
+            const playPromise = player.play();
+
+            // NOW it's safe to await — iOS already received the play postMessage above
+            if (previouslyPlaying && previouslyPlaying !== wrap) {
+              await this.pauseVideo(previouslyPlaying);
+            }
+
+            try {
+              await playPromise;
+              await player.setCurrentTime(0);
+
+              window.IS_DEBUG_MODE &&
+                console.debug('[InlineVimeoPlayer] Playing video with sound:', videoUrl);
+            } catch (err) {
+              console.error('[InlineVimeoPlayer] Play failed:', err);
+              videoInstance.isClickPlaying = false;
+              this.currentlyPlaying = null;
+              wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
+            }
+          });
+
           wrap.addEventListener('mouseenter', () => {
             if (videoInstance.isClickPlaying) return;
             player.setMuted(true);
@@ -216,6 +214,34 @@ class InlineVimeoPlayer {
             player.pause();
             wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
             window.IS_DEBUG_MODE && console.debug('[InlineVimeoPlayer] Hover pause:', videoUrl);
+          });
+        } else {
+          // MOBILE: don't intercept the tap — let it hit the iframe directly.
+          // iOS requires the gesture to land on the iframe itself for unmuted audio.
+          // Instead, drive UI state from Vimeo SDK events.
+
+          // Make the wrap transparent to pointer events so taps reach the iframe.
+          // The CSS overlay/thumbnail must also have pointer-events: none on mobile.
+          wrap.style.pointerEvents = 'none';
+
+          // Let the iframe itself be tappable — it fills the wrap
+          const iframe = wrap.querySelector('iframe');
+          if (iframe) (iframe as HTMLElement).style.pointerEvents = 'auto';
+
+          player.on('play', () => {
+            const instance = this.videoInstances.get(wrap);
+            if (!instance) return;
+            instance.isClickPlaying = true;
+            this.currentlyPlaying = wrap;
+            wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PLAYING);
+          });
+
+          player.on('pause', () => {
+            const instance = this.videoInstances.get(wrap);
+            if (!instance) return;
+            instance.isClickPlaying = false;
+            if (this.currentlyPlaying === wrap) this.currentlyPlaying = null;
+            wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PAUSED);
           });
         }
       }
