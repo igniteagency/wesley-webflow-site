@@ -101,6 +101,25 @@ class InlineVimeoPlayer {
       return null;
     }
   }
+  private async pauseVideo(wrap: HTMLElement): Promise<void> {
+    const instance = this.videoInstances.get(wrap);
+    const player = instance?.player;
+    const videoUrl = wrap.getAttribute(this.VIDEO_URL_ATTR);
+
+    if (!player) {
+      console.warn('[InlineVimeoPlayer] No player instance found for wrap:', wrap);
+      return;
+    }
+
+    await player.pause();
+    instance.isClickPlaying = false;
+    wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PAUSED);
+    window.IS_DEBUG_MODE && console.debug('[InlineVimeoPlayer] Paused video:', videoUrl);
+
+    if (this.currentlyPlaying === wrap) {
+      this.currentlyPlaying = null;
+    }
+  }
 
   private async initializeVideo(wrap: HTMLElement): Promise<void> {
     if (this.videoInstances.has(wrap)) return;
@@ -114,79 +133,68 @@ class InlineVimeoPlayer {
     const thumbnailUrl = await this.fetchThumbnail(videoUrl!);
     wrap.style.setProperty('--thumb', `url('${thumbnailUrl}')`);
 
+    const canHover = !window.matchMedia('(pointer: coarse)').matches;
+
     try {
       const player = new window.Vimeo.Player(wrap, {
         url: videoUrl as VimeoUrl,
-        background: false, // Essential: background:true blocks audio unmuting
+        background: canHover, // Background videos on desktop to allow parallel video playing on hover
         controls: false,
-        muted: shouldAutoplay, // Start muted if autoplay is enabled
+        muted: canHover ? true : shouldAutoplay, // Start muted if autoplay is enabled
         autoplay: shouldAutoplay,
         loop: shouldLoop,
         playsinline: true,
       });
 
-      let isClickPlaying = false;
-
-      // The logic to stop this specific video
-      const stopThisVideo = async () => {
-        await player.pause();
-        isClickPlaying = false;
-        wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PAUSED);
-        window.IS_DEBUG_MODE && console.debug('[InlineVimeoPlayer] Paused video:', videoUrl);
-        this.currentlyPlaying = null;
-      };
-
       // SAVE THE OBJECT IMMEDIATELY (Don't set it twice)
-      this.videoInstances.set(wrap, { player, pauseVideo: stopThisVideo });
+      this.videoInstances.set(wrap, { player, isClickPlaying: false });
 
       player.ready().then(() => {
-        player.setVolume(1);
-        if (!shouldAutoplay) player.setCurrentTime(1);
+        if (!shouldAutoplay) {
+          player.setCurrentTime(1);
+          if (canHover) player.setVolume(1);
+        }
         wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
       });
 
       if (isInterviewReel) {
-        const canHover = !window.matchMedia('(pointer: coarse)').matches;
+        const videoInstance = this.videoInstances.get(wrap);
 
         // CLICK HANDLER (Mobile + Desktop)
         wrap.addEventListener('click', async () => {
-          if (isClickPlaying) {
-            await stopThisVideo();
+          if (videoInstance.isClickPlaying) {
+            await this.pauseVideo(wrap);
             return;
           }
 
           // Save reference to previously playing video before updating
           const previouslyPlaying = this.currentlyPlaying;
 
-          // Mark as playing FIRST to prevent hover handlers from interfering
-          isClickPlaying = true;
+          videoInstance.isClickPlaying = true;
           this.currentlyPlaying = wrap;
           wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PLAYING);
 
-          // Pause the previously playing video using saved reference
-          if (previouslyPlaying && previouslyPlaying !== wrap) {
-            const instance = this.videoInstances.get(previouslyPlaying);
-            await instance.pauseVideo();
-            window.IS_DEBUG_MODE &&
-              console.debug(
-                '[InlineVimeoPlayer] Paused previously playing video due to new click:',
-                instance
-              );
+          if (canHover) {
+            player.setMuted(false);
+            player.setVolume(1);
           }
 
-          // iOS: Unmute first, then play immediately after
-          player.setMuted(false);
-          player.setVolume(1);
+          const playPromise = player.play();
+
+          // NOW it's safe to await — iOS already received the play postMessage above
+          if (previouslyPlaying && previouslyPlaying !== wrap) {
+            await this.pauseVideo(previouslyPlaying);
+          }
 
           try {
-            await player.play();
+            await playPromise;
             await player.setCurrentTime(0);
 
             window.IS_DEBUG_MODE &&
               console.debug('[InlineVimeoPlayer] Playing video with sound:', videoUrl);
           } catch (err) {
             console.error('[InlineVimeoPlayer] Play failed:', err);
-            isClickPlaying = false;
+            videoInstance.isClickPlaying = false;
             this.currentlyPlaying = null;
             wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
           }
@@ -195,7 +203,7 @@ class InlineVimeoPlayer {
         // HOVER HANDLER (Desktop Only)
         if (canHover) {
           wrap.addEventListener('mouseenter', () => {
-            if (isClickPlaying) return;
+            if (videoInstance.isClickPlaying) return;
             player.setMuted(true);
             player.play();
             wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_HOVER);
@@ -204,7 +212,7 @@ class InlineVimeoPlayer {
           });
 
           wrap.addEventListener('mouseleave', () => {
-            if (isClickPlaying) return;
+            if (videoInstance.isClickPlaying) return;
             player.pause();
             wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
             window.IS_DEBUG_MODE && console.debug('[InlineVimeoPlayer] Hover pause:', videoUrl);
@@ -213,7 +221,7 @@ class InlineVimeoPlayer {
       }
 
       player.on('ended', () => {
-        isClickPlaying = false;
+        this.videoInstances.get(wrap).isClickPlaying = false;
         if (this.currentlyPlaying === wrap) this.currentlyPlaying = null;
         wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
       });
