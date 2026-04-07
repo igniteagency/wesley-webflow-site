@@ -8,7 +8,7 @@
  * - No custom player controls
  */
 
-class InlineVideoPlayer {
+class InlineVimeoPlayer {
   private readonly VIDEO_WRAP_SELECTOR = '[data-inline-video]';
   private readonly VIDEO_URL_ATTR = 'data-video-url';
   private readonly VIDEO_LOOP_ATTR = 'data-video-loop';
@@ -31,14 +31,7 @@ class InlineVideoPlayer {
   }
 
   private initializeAll(): void {
-    window.IS_DEBUG_MODE &&
-      console.debug(
-        '[InlineVideoPlayer] Looking for video wraps with selector:',
-        this.VIDEO_WRAP_SELECTOR
-      );
     const videoWraps = document.querySelectorAll(this.VIDEO_WRAP_SELECTOR);
-    window.IS_DEBUG_MODE &&
-      console.debug('[InlineVideoPlayer] Found video wraps:', videoWraps.length);
 
     if (videoWraps.length === 0) {
       window.IS_DEBUG_MODE && console.debug('[InlineVideoPlayer] No video wraps found');
@@ -86,13 +79,7 @@ class InlineVideoPlayer {
 
   private getLocalThumbnailUrl(wrap: HTMLElement): string | null {
     const thumbImg = wrap.querySelector<HTMLImageElement>('img');
-    if (thumbImg?.src) {
-      window.IS_DEBUG_MODE &&
-        console.debug('[InlineVideoPlayer] Found local thumbnail image:', thumbImg.src);
-      return thumbImg.src;
-    }
-
-    return null;
+    return thumbImg?.src || null;
   }
 
   private async pauseVideo(wrap: HTMLElement): Promise<void> {
@@ -118,14 +105,12 @@ class InlineVideoPlayer {
   private async initializeVideo(wrap: HTMLElement): Promise<void> {
     if (this.videoInstances.has(wrap)) return;
 
-    let videoUrl = wrap.getAttribute(this.VIDEO_URL_ATTR);
+    const videoUrl = wrap.getAttribute(this.VIDEO_URL_ATTR);
 
     if (!videoUrl) {
       console.warn('[InlineVideoPlayer] No video URL found for wrap:', wrap);
       return;
     }
-
-    videoUrl = this.normaliseVimeoUrl(videoUrl);
 
     const isInterviewReel =
       wrap.getAttribute(this.INTERVIEW_VIDEO_ATTR) === this.INTERVIEW_VIDEO_ATTR_VALUE;
@@ -140,6 +125,7 @@ class InlineVideoPlayer {
     const playerContainer = document.createElement('div');
     playerContainer.setAttribute('data-plyr-provider', 'vimeo');
     playerContainer.setAttribute('data-plyr-embed-id', videoUrl);
+    playerContainer.setAttribute('data-plyr-embed-hash', this.extractVimeoHash(videoUrl));
     playerContainer.setAttribute('data-poster', thumbnailUrl || '');
     wrap.appendChild(playerContainer);
 
@@ -272,17 +258,15 @@ class InlineVideoPlayer {
     }
   }
 
-  private normaliseVimeoUrl(url: string): string {
+  private extractVimeoHash(url: string): string {
     try {
       const parsed = new URL(url);
       const parts = parsed.pathname.split('/').filter(Boolean);
 
-      // e.g. ['1160011511', '8943a64861']
       const [id, hash] = parts;
 
-      if (!hash) return url; // Nothing to convert, return as-is
-
-      return `https://vimeo.com/${id}?h=${hash}`;
+      if (!hash) return '';
+      return hash;
     } catch {
       return url;
     }
@@ -315,12 +299,12 @@ window.Webflow = window.Webflow || [];
 window.Webflow.push(() => {
   const hasPlyr = !!window.Plyr;
   if (hasPlyr) {
-    new InlineVideoPlayer();
+    new InlineVimeoPlayer();
   } else {
     document.addEventListener(
       'scriptLoaded:plyr',
       () => {
-        new InlineVideoPlayer();
+        new InlineVimeoPlayer();
       },
       { once: true }
     );
