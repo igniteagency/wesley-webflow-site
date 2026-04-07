@@ -135,7 +135,7 @@ class InlineVimeoPlayer {
         muted: canHover ? true : shouldAutoplay,
         loop: { active: shouldLoop },
         controls: [],
-        clickToPlay: !canHover,
+        clickToPlay: false,
         hideControls: true,
         fullscreen: { enabled: false },
         keyboard: { focused: false, global: false },
@@ -147,7 +147,7 @@ class InlineVimeoPlayer {
         playsinline: true,
         vimeo: {
           speed: false,
-          background: false,
+          background: canHover,
           controls: shouldAutoplay ? false : !canHover,
           title: false,
           byline: false,
@@ -168,13 +168,10 @@ class InlineVimeoPlayer {
         wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
       });
 
-      if (isInterviewReel) {
+      if (isInterviewReel && canHover) {
         player.on('play', async () => {
           if (shouldAutoplay || videoInstance.isHoverPlaying) return;
           if (!videoInstance.isClickPlaying) {
-            // if (this.currentlyClickPlaying && this.currentlyClickPlaying !== wrap) {
-            //   await this.pauseVideo(this.currentlyClickPlaying);
-            // }
             videoInstance.isClickPlaying = true;
             this.currentlyClickPlaying = wrap;
             wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PLAYING);
@@ -187,70 +184,64 @@ class InlineVimeoPlayer {
           }
         });
 
-        // Custom video handlers for desktop only
-        if (canHover) {
-          wrap.addEventListener('click', () => {
-            if (videoInstance.isClickPlaying) {
-              this.pauseVideo(wrap); // No await
-              return;
+        wrap.addEventListener('click', () => {
+          if (videoInstance.isClickPlaying) {
+            this.pauseVideo(wrap); // No await
+            return;
+          }
+
+          // Handle other playing videos synchronously
+          if (this.currentlyClickPlaying && this.currentlyClickPlaying !== wrap) {
+            const prevInstance = this.videoInstances.get(this.currentlyClickPlaying);
+            if (prevInstance) {
+              prevInstance.player.pause();
+              prevInstance.isClickPlaying = false;
+              this.currentlyClickPlaying.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PAUSED);
             }
+          }
 
-            // Handle other playing videos synchronously
-            if (this.currentlyClickPlaying && this.currentlyClickPlaying !== wrap) {
-              const prevInstance = this.videoInstances.get(this.currentlyClickPlaying);
-              if (prevInstance) {
-                prevInstance.player.pause();
-                prevInstance.isClickPlaying = false;
-                this.currentlyClickPlaying.setAttribute(
-                  this.PLAY_STATE_ATTR,
-                  this.PLAY_STATE_PAUSED
-                );
-              }
-            }
+          // Play immediately (no await before this line)
+          const playPromise = player.play();
 
-            // Play immediately (no await before this line)
-            const playPromise = player.play();
+          videoInstance.isClickPlaying = true;
+          this.currentlyClickPlaying = wrap;
+          wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PLAYING);
 
-            videoInstance.isClickPlaying = true;
-            this.currentlyClickPlaying = wrap;
-            wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PLAYING);
+          player.muted = false;
+          player.volume = 1;
 
-            player.muted = false;
-            player.volume = 1;
+          if (playPromise !== undefined) {
+            playPromise
+              .then(() => {
+                // ONLY seek to 0 on desktop.
+                // Seeking immediately after play resolves on iOS kills the audio track.
+                if (canHover) {
+                  player.currentTime = 0;
+                }
+              })
+              .catch((error) => {
+                console.error('Playback failed', error);
+              });
+          }
+        });
 
-            if (playPromise !== undefined) {
-              playPromise
-                .then(() => {
-                  // ONLY seek to 0 on desktop.
-                  // Seeking immediately after play resolves on iOS kills the audio track.
-                  if (canHover) {
-                    player.currentTime = 0;
-                  }
-                })
-                .catch((error) => {
-                  console.error('Playback failed', error);
-                });
-            }
-          });
+        wrap.addEventListener('mouseenter', () => {
+          if (videoInstance.isClickPlaying) return;
+          videoInstance.isHoverPlaying = true;
+          player.muted = true;
+          player.play();
+          wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_HOVER);
+          window.IS_DEBUG_MODE &&
+            console.debug('[InlineVideoPlayer] Hover play (muted):', videoUrl);
+        });
 
-          wrap.addEventListener('mouseenter', () => {
-            if (videoInstance.isClickPlaying) return;
-            videoInstance.isHoverPlaying = true;
-            player.muted = true;
-            player.play();
-            wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_HOVER);
-            window.IS_DEBUG_MODE &&
-              console.debug('[InlineVideoPlayer] Hover play (muted):', videoUrl);
-          });
-
-          wrap.addEventListener('mouseleave', () => {
-            if (videoInstance.isClickPlaying) return;
-            videoInstance.isHoverPlaying = false;
-            player.pause();
-            wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
-            window.IS_DEBUG_MODE && console.debug('[InlineVideoPlayer] Hover pause:', videoUrl);
-          });
-        }
+        wrap.addEventListener('mouseleave', () => {
+          if (videoInstance.isClickPlaying) return;
+          videoInstance.isHoverPlaying = false;
+          player.pause();
+          wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
+          window.IS_DEBUG_MODE && console.debug('[InlineVideoPlayer] Hover pause:', videoUrl);
+        });
       }
 
       player.on('ended', () => {
