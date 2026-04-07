@@ -9,7 +9,7 @@
  */
 
 class InlineVideoPlayer {
-  private readonly VIDEO_WRAP_SELECTOR = '[data-video-el="vimeo"]';
+  private readonly VIDEO_WRAP_SELECTOR = '[data-inline-video]';
   private readonly VIDEO_URL_ATTR = 'data-video-url';
   private readonly VIDEO_LOOP_ATTR = 'data-video-loop';
   private readonly VIDEO_AUTOPLAY_ATTR = 'data-video-autoplay';
@@ -28,11 +28,6 @@ class InlineVideoPlayer {
 
   constructor() {
     this.initializeAll();
-  }
-
-  private extractVideoId(url: string): string {
-    const match = url.match(/vimeo\.com\/(\d+)/);
-    return match ? match[1] : '';
   }
 
   private initializeAll(): void {
@@ -123,39 +118,28 @@ class InlineVideoPlayer {
   private async initializeVideo(wrap: HTMLElement): Promise<void> {
     if (this.videoInstances.has(wrap)) return;
 
-    console.debug(
-      '[InlineVideoPlayer] Initializing video for wrap:',
-      wrap,
-      'Plyr available:',
-      !!window.Plyr
-    );
+    let videoUrl = wrap.getAttribute(this.VIDEO_URL_ATTR);
 
-    const videoUrl = wrap.getAttribute(this.VIDEO_URL_ATTR);
+    if (!videoUrl) {
+      console.warn('[InlineVideoPlayer] No video URL found for wrap:', wrap);
+      return;
+    }
+
+    videoUrl = this.normaliseVimeoUrl(videoUrl);
+
     const isInterviewReel =
       wrap.getAttribute(this.INTERVIEW_VIDEO_ATTR) === this.INTERVIEW_VIDEO_ATTR_VALUE;
     const shouldLoop = wrap.getAttribute(this.VIDEO_LOOP_ATTR) === 'true';
     const shouldAutoplay = wrap.getAttribute(this.VIDEO_AUTOPLAY_ATTR) === 'true';
 
     const thumbnailUrl = this.getLocalThumbnailUrl(wrap);
-    if (thumbnailUrl) {
-      wrap.style.setProperty('--thumb', `url('${thumbnailUrl}')`);
-    }
 
     const canHover = !window.matchMedia('(pointer: coarse)').matches;
-    const videoId = this.extractVideoId(videoUrl!);
-    console.debug(
-      '[InlineVideoPlayer] Video URL:',
-      videoUrl,
-      'Extracted ID:',
-      videoId,
-      'Thumbnail URL:',
-      thumbnailUrl
-    );
 
     // Create a container div for Plyr
     const playerContainer = document.createElement('div');
     playerContainer.setAttribute('data-plyr-provider', 'vimeo');
-    playerContainer.setAttribute('data-plyr-embed-id', videoId);
+    playerContainer.setAttribute('data-plyr-embed-id', videoUrl);
     playerContainer.setAttribute('data-poster', thumbnailUrl || '');
     wrap.appendChild(playerContainer);
 
@@ -179,28 +163,11 @@ class InlineVideoPlayer {
         // Remove source since we're using data attributes
       });
 
-      this.videoInstances.set(wrap, { player, isClickPlaying: false });
-
-      console.debug(
-        '[InlineVideoPlayer] Plyr initialized for wrap:',
-        wrap,
-        'Player container:',
-        playerContainer,
-        'Player:',
-        player
-      );
-      console.debug(
-        '[InlineVideoPlayer] Player container children after init:',
-        playerContainer.children
-      );
+      const videoInstance = { player, isClickPlaying: false, isHoverPlaying: false };
+      this.videoInstances.set(wrap, videoInstance);
 
       player.on('ready', () => {
-        console.debug(
-          '[InlineVideoPlayer] Plyr ready event fired for wrap:',
-          wrap,
-          'player container:',
-          playerContainer
-        );
+        console.debug('[InlineVideoPlayer] Plyr ready event fired for wrap:', videoUrl);
 
         if (!shouldAutoplay) {
           player.currentTime = 1;
@@ -209,15 +176,24 @@ class InlineVideoPlayer {
         wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
       });
 
-      player.on('pause', () => {
-        const instance = this.videoInstances.get(wrap);
-        if (instance) {
-          instance.isClickPlaying = false;
-        }
-      });
-
       if (isInterviewReel) {
-        const videoInstance = this.videoInstances.get(wrap);
+        player.on('play', async () => {
+          if (shouldAutoplay || videoInstance.isHoverPlaying) return;
+          if (!videoInstance.isClickPlaying) {
+            if (this.currentlyClickPlaying && this.currentlyClickPlaying !== wrap) {
+              await this.pauseVideo(this.currentlyClickPlaying);
+            }
+            videoInstance.isClickPlaying = true;
+            this.currentlyClickPlaying = wrap;
+            wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PLAYING);
+          }
+        });
+
+        player.on('pause', () => {
+          if (!videoInstance.isHoverPlaying) {
+            videoInstance.isClickPlaying = false;
+          }
+        });
 
         // Click handler for all devices
         wrap.addEventListener('click', async () => {
@@ -226,7 +202,6 @@ class InlineVideoPlayer {
             return;
           }
 
-          // Pause previously playing video
           if (this.currentlyClickPlaying && this.currentlyClickPlaying !== wrap) {
             await this.pauseVideo(this.currentlyClickPlaying);
           }
@@ -235,17 +210,14 @@ class InlineVideoPlayer {
           this.currentlyClickPlaying = wrap;
           wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PLAYING);
 
-          // if (canHover) {
           player.muted = false;
           player.volume = 1;
-          // }
 
           const playPromise = player.play();
 
           try {
             await playPromise;
             player.currentTime = 0;
-
             window.IS_DEBUG_MODE && console.debug('[InlineVideoPlayer] Click play:', videoUrl);
           } catch (err) {
             console.error('[InlineVideoPlayer] Play failed:', err);
@@ -259,6 +231,7 @@ class InlineVideoPlayer {
         if (canHover) {
           wrap.addEventListener('mouseenter', () => {
             if (videoInstance.isClickPlaying) return;
+            videoInstance.isHoverPlaying = true;
             player.muted = true;
             player.play();
             wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_HOVER);
@@ -268,15 +241,20 @@ class InlineVideoPlayer {
 
           wrap.addEventListener('mouseleave', () => {
             if (videoInstance.isClickPlaying) return;
+            videoInstance.isHoverPlaying = false;
             player.pause();
             wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
             window.IS_DEBUG_MODE && console.debug('[InlineVideoPlayer] Hover pause:', videoUrl);
           });
         }
+      } else {
+        player.on('pause', () => {
+          videoInstance.isClickPlaying = false;
+        });
       }
 
       player.on('ended', () => {
-        this.videoInstances.get(wrap).isClickPlaying = false;
+        videoInstance.isClickPlaying = false;
         if (this.currentlyClickPlaying === wrap) {
           this.currentlyClickPlaying = null;
         }
@@ -288,9 +266,25 @@ class InlineVideoPlayer {
         error,
         'for wrap:',
         wrap,
-        'player container:',
-        playerContainer
+        'player target:',
+        playerTarget
       );
+    }
+  }
+
+  private normaliseVimeoUrl(url: string): string {
+    try {
+      const parsed = new URL(url);
+      const parts = parsed.pathname.split('/').filter(Boolean);
+
+      // e.g. ['1160011511', '8943a64861']
+      const [id, hash] = parts;
+
+      if (!hash) return url; // Nothing to convert, return as-is
+
+      return `https://vimeo.com/${id}?h=${hash}`;
+    } catch {
+      return url;
     }
   }
 
