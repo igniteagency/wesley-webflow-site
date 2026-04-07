@@ -36,15 +36,17 @@ class InlineVideoPlayer {
   }
 
   private initializeAll(): void {
-    console.debug(
-      '[InlineVideoPlayer] Looking for video wraps with selector:',
-      this.VIDEO_WRAP_SELECTOR
-    );
+    window.IS_DEBUG_MODE &&
+      console.debug(
+        '[InlineVideoPlayer] Looking for video wraps with selector:',
+        this.VIDEO_WRAP_SELECTOR
+      );
     const videoWraps = document.querySelectorAll(this.VIDEO_WRAP_SELECTOR);
-    console.debug('[InlineVideoPlayer] Found video wraps:', videoWraps.length);
+    window.IS_DEBUG_MODE &&
+      console.debug('[InlineVideoPlayer] Found video wraps:', videoWraps.length);
 
     if (videoWraps.length === 0) {
-      console.debug('[InlineVideoPlayer] No video wraps found');
+      window.IS_DEBUG_MODE && console.debug('[InlineVideoPlayer] No video wraps found');
       return;
     }
 
@@ -81,8 +83,6 @@ class InlineVideoPlayer {
     // Observe sections
     sectionMap.forEach((videos, section) => {
       this.observer!.observe(section);
-      window.IS_DEBUG_MODE &&
-        console.debug(`[InlineVideoPlayer] Observing section with ${videos.length} videos`);
     });
 
     window.IS_DEBUG_MODE &&
@@ -219,60 +219,59 @@ class InlineVideoPlayer {
       if (isInterviewReel) {
         const videoInstance = this.videoInstances.get(wrap);
 
+        // Click handler for all devices
+        wrap.addEventListener('click', async () => {
+          if (videoInstance.isClickPlaying) {
+            await this.pauseVideo(wrap);
+            return;
+          }
+
+          // Pause previously playing video
+          if (this.currentlyClickPlaying && this.currentlyClickPlaying !== wrap) {
+            await this.pauseVideo(this.currentlyClickPlaying);
+          }
+
+          videoInstance.isClickPlaying = true;
+          this.currentlyClickPlaying = wrap;
+          wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PLAYING);
+
+          // if (canHover) {
+          player.muted = false;
+          player.volume = 1;
+          // }
+
+          const playPromise = player.play();
+
+          try {
+            await playPromise;
+            player.currentTime = 0;
+
+            window.IS_DEBUG_MODE && console.debug('[InlineVideoPlayer] Click play:', videoUrl);
+          } catch (err) {
+            console.error('[InlineVideoPlayer] Play failed:', err);
+            videoInstance.isClickPlaying = false;
+            this.currentlyClickPlaying = null;
+            wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
+          }
+        });
+
+        // Hover handlers for desktop only
         if (canHover) {
-          wrap.addEventListener('click', async () => {
-            if (videoInstance.isClickPlaying) {
-              await this.pauseVideo(wrap);
-              return;
-            }
-
-            // Pause previously playing video
-            if (this.currentlyClickPlaying && this.currentlyClickPlaying !== wrap) {
-              await this.pauseVideo(this.currentlyClickPlaying);
-            }
-
-            videoInstance.isClickPlaying = true;
-            this.currentlyClickPlaying = wrap;
-            wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_PLAYING);
-
-            if (canHover) {
-              player.muted = false;
-              player.volume = 1;
-            }
-
-            const playPromise = player.play();
-
-            try {
-              await playPromise;
-              player.currentTime = 0;
-
-              window.IS_DEBUG_MODE &&
-                console.debug('[InlineVideoPlayer] Playing video with sound:', videoUrl);
-            } catch (err) {
-              console.error('[InlineVideoPlayer] Play failed:', err);
-              videoInstance.isClickPlaying = false;
-              this.currentlyClickPlaying = null;
-              wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
-            }
+          wrap.addEventListener('mouseenter', () => {
+            if (videoInstance.isClickPlaying) return;
+            player.muted = true;
+            player.play();
+            wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_HOVER);
+            window.IS_DEBUG_MODE &&
+              console.debug('[InlineVideoPlayer] Hover play (muted):', videoUrl);
           });
 
-          if (canHover) {
-            wrap.addEventListener('mouseenter', () => {
-              if (videoInstance.isClickPlaying) return;
-              player.muted = true;
-              player.play();
-              wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_HOVER);
-              window.IS_DEBUG_MODE &&
-                console.debug('[InlineVideoPlayer] Hover play (muted):', videoUrl);
-            });
-
-            wrap.addEventListener('mouseleave', () => {
-              if (videoInstance.isClickPlaying) return;
-              player.pause();
-              wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
-              window.IS_DEBUG_MODE && console.debug('[InlineVideoPlayer] Hover pause:', videoUrl);
-            });
-          }
+          wrap.addEventListener('mouseleave', () => {
+            if (videoInstance.isClickPlaying) return;
+            player.pause();
+            wrap.setAttribute(this.PLAY_STATE_ATTR, this.PLAY_STATE_NONE);
+            window.IS_DEBUG_MODE && console.debug('[InlineVideoPlayer] Hover pause:', videoUrl);
+          });
         }
       }
 
