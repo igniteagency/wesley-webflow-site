@@ -3,16 +3,16 @@ import type GSAP from 'gsap';
 import type ScrollTrigger from 'gsap/ScrollTrigger';
 import type SplitText from 'gsap/SplitText';
 import type jQuery from 'jquery';
-import type Player from '@vimeo/player';
 import type { ScriptOptions } from 'src/entry';
+import type Plyr from 'plyr';
 
 import type { SCRIPTS_ENV } from '$dev/env';
 
 interface Webflow_IX3 extends Webflow.require {
   emit: (
-    eventName: string, 
-    details?: any, 
-    targetElement?: Element | null, 
+    eventName: string,
+    details?: any,
+    targetElement?: Element | null,
     options?: { bubbles?: boolean }
   ) => void;
   destroy: () => void;
@@ -73,10 +73,8 @@ declare global {
 
     jQuery: typeof jQuery;
 
-    /** Vimeo Player API */
-    Vimeo?: {
-      Player: typeof Player;
-    };
+    /** Plyr Player API */
+    Plyr?: typeof Plyr;
   }
 
   // Extend `querySelector` and `querySelectorAll` function
