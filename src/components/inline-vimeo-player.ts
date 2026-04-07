@@ -288,11 +288,11 @@ class InlineVimeoPlayer {
 // Load Plyr CSS
 const plyrCSSLink = document.createElement('link');
 plyrCSSLink.rel = 'stylesheet';
-plyrCSSLink.href = 'https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css';
+plyrCSSLink.href = 'https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.min.css';
 document.head.appendChild(plyrCSSLink);
 
 // Load Plyr JS
-window.loadScript('https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.js', { name: 'plyr' });
+window.loadScript('https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.min.js', { name: 'plyr' });
 
 // Initialize after Webflow is ready and Plyr is available
 window.Webflow = window.Webflow || [];
