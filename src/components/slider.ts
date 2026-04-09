@@ -132,10 +132,11 @@ class SwiperSlider {
         speed: 1000,
         effect,
         coverflowEffect: {
-          rotate: 25,
-          stretch: 0,
-          depth: 100,
-          modifier: 1,
+          rotate: 0,
+          stretch: -12,
+          depth: 200,
+          modifier: 1.2,
+          scale: 1,
           slideShadows: true,
         },
         creativeEffect: {
