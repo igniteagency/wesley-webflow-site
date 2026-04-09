@@ -130,6 +130,7 @@ class SwiperSlider {
           ? 'auto'
           : (slidesPerView as number | 'auto'),
         speed: 1000,
+        loopAdditionalSlides: 2,
         effect,
         coverflowEffect: {
           rotate: 0,
