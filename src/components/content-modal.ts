@@ -49,10 +49,13 @@ class ContentModal {
   }
 
   private handleScroll(container: HTMLElement, direction: 'prev' | 'next' | 'first' | 'last') {
-    const scrollAmount = container.clientWidth;
-    const maxScroll = container.scrollWidth - container.clientWidth;
+    const scrollAmount = container.getBoundingClientRect().width;
+    const maxScroll = container.scrollWidth - scrollAmount;
     const currentScroll = container.scrollLeft;
     const tolerance = 5; // Tolerance for scroll position calculation
+
+    // Determine current logical index to prevent sub-pixel rounding errors accumulating
+    const currentIndex = Math.round(currentScroll / scrollAmount);
 
     let targetScroll = 0;
 
@@ -68,7 +71,7 @@ class ContentModal {
 
         targetScroll = 0;
       } else {
-        targetScroll = currentScroll + scrollAmount;
+        targetScroll = (currentIndex + 1) * scrollAmount;
       }
 
       container.scrollTo({
@@ -87,7 +90,7 @@ class ContentModal {
 
         targetScroll = maxScroll;
       } else {
-        targetScroll = currentScroll - scrollAmount;
+        targetScroll = (currentIndex - 1) * scrollAmount;
       }
 
       container.scrollTo({
