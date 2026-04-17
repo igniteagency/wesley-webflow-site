@@ -53,13 +53,16 @@ export function gsapHorizontalDraggableLoop(items, config) {
           ? items[0].parentNode
           : gsap.utils.toArray(center)[0] || items[0].parentNode,
       totalWidth,
-      getTotalWidth = () =>
-        items[length - 1].offsetLeft +
+      getTotalWidth = () => {
+        let tw = items[length - 1].offsetLeft +
         (xPercents[length - 1] / 100) * widths[length - 1] -
         startX +
         spaceBefore[0] +
         items[length - 1].offsetWidth * gsap.getProperty(items[length - 1], 'scaleX') +
-        (parseFloat(config.paddingRight) || 0),
+        (parseFloat(config.paddingRight) || 0);
+        window._gsapSliderDebug = { length, startX, offsetLeftLast: items[length - 1].offsetLeft, widthLast: widths[length - 1], paddingRight: config.paddingRight, tw };
+        return tw;
+      },
       populateWidths = () => {
         let b1 = container.getBoundingClientRect(),
           b2;
