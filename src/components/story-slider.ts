@@ -57,10 +57,29 @@ class StorySlider {
 
   private initDraggableMainSlider() {
     let activeSlide: HTMLElement | null;
+    
+    let flexGap = 0;
+    if (this.storyItemsList.length > 0) {
+      const parentNode = this.storyItemsList[0].parentNode as HTMLElement;
+      if (parentNode) {
+        parentNode.style.display = 'flex';
+        parentNode.style.flexWrap = 'nowrap';
+        const gapVal = parseFloat(window.getComputedStyle(parentNode).gap);
+        if (!isNaN(gapVal)) {
+          flexGap = gapVal;
+        }
+      }
+      this.storyItemsList.forEach((el) => {
+        el.style.flexShrink = '0';
+      });
+    }
+
     const loop = gsapHorizontalDraggableLoop(this.storyItemsList, {
       paused: true,
       draggable: true,
-      center: this.sectionEl,
+      // center: this.sectionEl,
+      center: true,
+      paddingRight: flexGap,
       onChange: (slide, index) => {
         // when the active slide changes
         activeSlide && activeSlide.classList.remove(this.ACTIVE_SLIDE_CLASS);
