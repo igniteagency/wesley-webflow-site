@@ -127,14 +127,14 @@ export class AutoRotatingTabs {
     const height = content.scrollHeight;
 
     if (!wasOpen) {
-      gsap.set(content, { height: 0 });
+      gsap.set(content, { height: 0, overflow: 'hidden' });
     }
     gsap.to(content, {
       height,
       duration: 0.3,
       overwrite: true,
       onComplete: () => {
-        gsap.set(content, { height: 'auto' });
+        gsap.set(content, { height: 'auto', clearProps: 'overflow' });
       },
     });
   }
@@ -153,10 +153,13 @@ export class AutoRotatingTabs {
           height: 0,
           duration: 0.3,
           overwrite: true,
+          onStart: () => {
+            gsap.set(content, { overflow: 'hidden' });
+          },
           onComplete: () => {
             tab.open = false;
             tab.classList.remove(this.TAB_CLOSING_CLASS);
-            gsap.set(content, { clearProps: 'height' });
+            gsap.set(content, { clearProps: 'height,overflow' });
           },
         });
       }
