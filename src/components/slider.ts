@@ -123,6 +123,36 @@ class SwiperSlider {
       const gapAttr = wrapperEl?.getAttribute(this.CUSTOM_GAP_ATTR);
       const gap = gapAttr !== null && gapAttr !== undefined ? Number.parseFloat(gapAttr) : 32;
 
+      // Per-instance loop additional slides (default 2)
+      const loopAdditionalAttr = wrapperEl?.getAttribute('data-loop-additional-slides');
+      const parsedLoopAdditional = loopAdditionalAttr ? Number.parseInt(loopAdditionalAttr, 10) : NaN;
+      const loopAdditionalSlides = Number.isNaN(parsedLoopAdditional) ? 2 : parsedLoopAdditional;
+
+      // Pre-clone slides if requested (fixes loop bugs with few slides)
+      const cloneAttr = wrapperEl?.getAttribute('data-clone-slides');
+      if (
+        cloneAttr === 'true' ||
+        cloneAttr === '1' ||
+        cloneAttr === 'yes' ||
+        cloneAttr === 'on' ||
+        cloneAttr === ''
+      ) {
+        if (wrapperEl) {
+          const slides = Array.from(wrapperEl.children).filter((el) =>
+            el.classList.contains('swiper-slide')
+          );
+          // Only multiply if there is a small amount, to prevent infinitely long DOMs if applied by accident
+          if (slides.length > 0 && slides.length <= 8) {
+            // Duplicate them once to provide enough buffer
+            slides.forEach((slide) => {
+              const clone = slide.cloneNode(true) as HTMLElement;
+              clone.classList.add('is-cloned-by-js');
+              wrapperEl.appendChild(clone);
+            });
+          }
+        }
+      }
+
       const instance = new Swiper(swiperEl, {
         loop,
         spaceBetween: gap,
@@ -130,7 +160,7 @@ class SwiperSlider {
           ? 'auto'
           : (slidesPerView as number | 'auto'),
         speed: 1000,
-        loopAdditionalSlides: 2,
+        loopAdditionalSlides,
         effect,
         coverflowEffect: {
           rotate: 0,
