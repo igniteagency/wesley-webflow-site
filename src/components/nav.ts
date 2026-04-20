@@ -8,13 +8,11 @@ export function initNavScrollBehavior() {
     return;
   }
 
-  const isMobile = window.matchMedia('(max-width: 768px)').matches;
-
   ScrollTrigger.create({
     trigger: document.body,
-    start: isMobile ? 30 : 100,
-    end: 'max', // Use max instead of a fixed huge number so markers don't artificially expand the page
-    toggleClass: { targets: navbarWrapper, className: SCROLLED_CLASS },
+    start: () => (window.innerWidth <= 768 ? 30 : 100),
+    onEnter: () => navbarWrapper.classList.add(SCROLLED_CLASS),
+    onLeaveBack: () => navbarWrapper.classList.remove(SCROLLED_CLASS),
     invalidateOnRefresh: true,
     id: 'nav-scroll-toggle',
     markers: window.IS_DEBUG_MODE,
