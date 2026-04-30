@@ -9,7 +9,7 @@
  */
 
 class InlineVimeoPlayer {
-  private readonly VIDEO_WRAP_SELECTOR = '[data-inline-video]';
+  private readonly VIDEO_WRAP_SELECTOR = '[data-inline-video], [data-video-el="vimeo"]';
   private readonly VIDEO_URL_ATTR = 'data-video-url';
   private readonly VIDEO_LOOP_ATTR = 'data-video-loop';
   private readonly VIDEO_AUTOPLAY_ATTR = 'data-video-autoplay';
@@ -256,9 +256,7 @@ class InlineVimeoPlayer {
         '[InlineVideoPlayer] Init error:',
         error,
         'for wrap:',
-        wrap,
-        'player target:',
-        playerTarget
+        wrap
       );
     }
   }
@@ -302,16 +300,15 @@ window.loadScript('https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.min.js', { 
 // Initialize after Webflow is ready and Plyr is available
 window.Webflow = window.Webflow || [];
 window.Webflow.push(() => {
-  const hasPlyr = !!window.Plyr;
-  if (hasPlyr) {
-    new InlineVimeoPlayer();
-  } else {
-    document.addEventListener(
-      'scriptLoaded:plyr',
-      () => {
-        new InlineVimeoPlayer();
-      },
-      { once: true }
-    );
+  const checkAndInit = () => {
+    if (window.Plyr) {
+      new InlineVimeoPlayer();
+      return true;
+    }
+    return false;
+  };
+
+  if (!checkAndInit()) {
+    document.addEventListener('scriptLoaded:plyr', () => checkAndInit(), { once: true });
   }
 });
