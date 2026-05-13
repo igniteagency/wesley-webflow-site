@@ -65,6 +65,10 @@ class TourCtaDrawingReveal {
     // Hide the visible white stroke; we only want the reveal via mask
     visiblePath.setAttribute('stroke', 'none');
 
+    // Fade the mask hole so it is not visible when mouse is outside the section
+    maskPath.style.transition = 'opacity 0.3s ease';
+    maskPath.style.opacity = '0';
+
     // Track drawing across multiple segments (each hover pass is one segment)
     const segments: Point[][] = [];
     let current: Point[] | null = null;
@@ -84,6 +88,9 @@ class TourCtaDrawingReveal {
     };
 
     const onPointerEnter = (e: PointerEvent) => {
+      // Fade in the spotlight/mask when entering
+      maskPath.style.opacity = '1';
+
       // Begin a new segment on each enter
       const p = this.clientToSvgPoint(svg, e.clientX, e.clientY);
       current = [p];
@@ -120,6 +127,9 @@ class TourCtaDrawingReveal {
     };
 
     const onPointerLeave = () => {
+      // Fade out the spotlight/mask when leaving
+      maskPath.style.opacity = '0';
+      
       isDrawing = false;
       current = null;
     };

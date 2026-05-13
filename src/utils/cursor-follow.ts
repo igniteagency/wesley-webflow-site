@@ -90,6 +90,9 @@ export function initCursorFollow(): void {
       return { x, y };
     }
 
+    // Initialize spotlight opacity to 0.6 (solid overlay, no hole)
+    gsap.set(container, { '--spotlight-opacity': 0.6 });
+
     container.addEventListener('pointerenter', (e: PointerEvent) => {
       updateRect();
       updateSize();
@@ -97,6 +100,9 @@ export function initCursorFollow(): void {
       gsap.set(container, { '--x': x, '--y': y });
       gsap.set(followers, { x, y });
       gsap.to(followers, { opacity: 1, duration: 0.25, ease: 'power3.out' });
+      
+      // Animate to 0 to open the transparent hole
+      gsap.to(container, { '--spotlight-opacity': 0, duration: 0.25, ease: 'power3.out' });
       primed = true;
     });
 
@@ -117,7 +123,9 @@ export function initCursorFollow(): void {
 
     container.addEventListener('pointerleave', () => {
       gsap.to(followers, { opacity: 0, duration: 0.2, ease: 'power3.in' });
-      gsap.set(container, { '--x': '50%', '--y': '50%' });
+      
+      // Animate to 0.6 to close the transparent hole
+      gsap.to(container, { '--spotlight-opacity': 0.6, duration: 0.2, ease: 'power3.in' });
       primed = false;
     });
   });
